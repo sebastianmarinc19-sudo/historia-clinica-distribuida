@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: medyagh/setup-minikube@v0.0.18
+      - uses: medyagh/setup-minikube@v0.0.21
         with:
           driver: docker
           cpus: 2
