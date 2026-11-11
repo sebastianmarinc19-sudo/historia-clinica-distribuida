@@ -758,7 +758,7 @@ par("**Uso de IA.** Este proyecto se desarrolló con apoyo de un asistente de IA
     "de este documento y de los diagramas; las decisiones de alcance las tomó el equipo cuando el asistente las consultó. Cada pieza se ejecutó antes de darse por buena (pruebas con PostgreSQL real, despliegue en Docker Compose y en Minikube, E2E en Chromium, CI local y los mensajes de ejemplo del curso). "
     "Quedan sin verificar: el CI/CD en GitHub Actions y el E2E de las vistas nuevas contra Kubernetes (pasó en Compose; en Kubernetes se verificaron con jsdom). Cada integrante debe poder explicar y modificar en vivo cualquier parte que se entregue; la bitácora lista qué partes revisar antes de la sustentación.")
 par("**Código abierto usado** (licencias: revisar en cada proyecto): PostgreSQL, FastAPI, Uvicorn, psycopg2, Pydantic, HAPI FHIR, nginx, Prometheus, Kubernetes y Minikube, Docker Compose, Grafana, Playwright, jsdom, newman, PlantUML, age, rclone, ruff, shellcheck y gitleaks.")
-par("**Contribución por integrante.** Debe salir del historial real de git (`scripts/bitacora_commits.sh`); a la fecha de este documento el trabajo está sin commit y el equipo completa esa tabla con sus commits. No se fabrica ni se reescribe el historial.")
+par("**Contribución por integrante.** Debe salir del historial real de git (`scripts/bitacora_commits.sh`); el historial real está en https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida/commits/reingenieria-3-sedes y la tabla por fase se genera de él. No se fabrica ni se reescribe el historial.")
 
 # ====================================================================== AVANCE
 add(h1("AVANCE INICIAL"))

@@ -33,7 +33,7 @@ El repositorio de partida es el del docente (`jaiderreyes/historia-clinica-distr
 
 ## 2. Contribución de cada integrante
 
-El historial de git debe mostrar commits de **ambos** integrantes a lo largo de las 5 fases. A la fecha de esta bitácora **el trabajo está sin commit**: la tabla se genera del historial real con
+El historial de git debe mostrar commits de **ambos** integrantes a lo largo de las 5 fases. El historial real está en <https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida/commits/reingenieria-3-sedes>. La tabla se genera de él con
 
 ```bash
 bash scripts/bitacora_commits.sh --por-fase
