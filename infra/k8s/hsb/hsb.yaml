@@ -1,0 +1,129 @@
+# Bus de integración de salud (HSB): recibe HL7 v2 y CSV de las sedes, valida, transforma a FHIR y entrega a HAPI y a la API de cada sede.
+# Su estado (cola, idempotencia, terminología) vive en SU PostgreSQL, así que el bus se reinicia o se replica sin perder mensajes.
+# Secretos (los crea scripts/k8s_desplegar.sh; no van en el repositorio):
+#   hsb-secretos : POSTGRES_PASSWORD            hsb-auth : HC_JWT_SECRETO, HSB_CLAVE (clave de la cuenta de servicio `hsb` de las sedes)
+apiVersion: v1
+kind: Service
+metadata:
+  name: pg-hsb
+  namespace: hc-hsb
+spec:
+  selector: {app: pg-hsb}
+  ports: [{name: pg, port: 5432, targetPort: 5432}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pg-hsb
+  namespace: hc-hsb
+spec:
+  serviceName: pg-hsb
+  replicas: 1
+  selector:
+    matchLabels: {app: pg-hsb}
+  template:
+    metadata:
+      labels: {app: pg-hsb}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - {name: POSTGRES_USER, value: hsb}
+            - {name: POSTGRES_DB, value: hsb}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: hsb-secretos, key: POSTGRES_PASSWORD}}
+          ports: [{name: pg, containerPort: 5432}]
+          readinessProbe:
+            exec: {command: [sh, -c, "pg_isready -h 127.0.0.1 -U hsb -d hsb"]}
+            periodSeconds: 3
+          livenessProbe:
+            exec: {command: [sh, -c, "pg_isready -h 127.0.0.1 -U hsb -d hsb"]}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 20m, memory: 48Mi}
+            limits: {memory: 192Mi}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 256Mi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hsb
+  namespace: hc-hsb
+spec:
+  replicas: 2          # dos réplicas del bus: la idempotencia y la cola viven en la base, así que no se pisan ni duplican
+  selector:
+    matchLabels: {app: hsb}
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  template:
+    metadata:
+      labels: {app: hsb}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: hsb
+          image: hc-hsb:local
+          imagePullPolicy: Never          # se carga en Minikube con `minikube image load`
+          env:
+            - {name: HSB_DB_HOST, value: pg-hsb}
+            - {name: HSB_DB_NAME, value: hsb}
+            - {name: HSB_DB_USER, value: hsb}
+            - name: HSB_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: hsb-secretos, key: POSTGRES_PASSWORD}}
+            # HAPI: en el entorno de pruebas solo Sincelejo lo tiene activo (RAM); con un HAPI por sede use HSB_FHIR_URLS="1=…,2=…,3=…"
+            - {name: HSB_FHIR_URL, value: "http://hapi.sede-sincelejo.svc.cluster.local:8080/fhir"}
+            - {name: HSB_API_URLS, value: "1=http://api.sede-sincelejo.svc.cluster.local:8001,2=http://api.sede-cartagena.svc.cluster.local:8001,3=http://api.sede-corozal.svc.cluster.local:8001"}
+            - {name: HSB_USUARIO, value: hsb}
+            - name: HSB_CLAVE
+              valueFrom: {secretKeyRef: {name: hsb-auth, key: HSB_CLAVE}}
+            - name: HC_JWT_SECRETO
+              valueFrom: {secretKeyRef: {name: hsb-auth, key: HC_JWT_SECRETO}}
+            # 12 intentos con espera 1, 2, 4, 8, 16, 30… s dan ~4 min: alcanza para un HAPI que arranca en frío (90 s a 3 min con poca RAM)
+            - {name: HSB_MAX_INTENTOS, value: "12"}
+          ports: [{name: http, containerPort: 8000}]
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {memory: 192Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hsb
+  namespace: hc-hsb
+spec:
+  selector: {app: hsb}
+  ports: [{name: http, port: 8000, targetPort: http}]
+---
+# Acceso directo al bus desde fuera del clúster (solo laboratorio: /health, /metrics y pruebas). Los clientes entran por el gateway (/hsb/…).
+apiVersion: v1
+kind: Service
+metadata:
+  name: hsb-ext
+  namespace: hc-hsb
+spec:
+  type: NodePort
+  selector: {app: hsb}
+  ports: [{name: http, port: 8000, targetPort: http, nodePort: 30800}]

@@ -1,0 +1,96 @@
+# PostgreSQL de la sede. Dos Services sobre el mismo pod:
+#   pg-local : lo usan la API y el HAPI FHIR de la propia sede
+#   pg       : lo usan las OTRAS sedes para replicar
+# Separarlos permite simular una partición entre sedes (quitar el selector de
+# `pg`) sin afectar a la sede, y mantiene la estructura aunque luego se
+# agregue un par primario/réplica dentro de la sede.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pg-local
+spec:
+  selector: {app: pg}
+  ports: [{name: pg, port: 5432, targetPort: 5432}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pg
+spec:
+  selector: {app: pg}
+  ports: [{name: pg, port: 5432, targetPort: 5432}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pg
+spec:
+  serviceName: pg-local
+  replicas: 1
+  selector:
+    matchLabels: {app: pg}
+  template:
+    metadata:
+      labels: {app: pg}
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          args:
+            - postgres
+            - -c
+            - wal_level=logical
+            - -c
+            - max_wal_senders=10
+            - -c
+            - max_replication_slots=10
+            - -c
+            - max_logical_replication_workers=8
+            - -c
+            - max_worker_processes=16
+            - -c
+            - max_slot_wal_keep_size=1GB
+            - -c
+            - wal_sender_timeout=10s
+            - -c
+            - wal_receiver_timeout=10s
+            - -c
+            - wal_retrieve_retry_interval=2s
+          env:
+            - {name: POSTGRES_USER, value: admin}
+            - {name: POSTGRES_DB, value: historia_clinica}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: hc-secretos, key: POSTGRES_PASSWORD}}
+            - name: REPLICATION_PASSWORD
+              valueFrom: {secretKeyRef: {name: hc-secretos, key: REPLICATION_PASSWORD}}
+          ports: [{name: pg, containerPort: 5432}]
+          readinessProbe:
+            exec: {command: [sh, -c, "pg_isready -h 127.0.0.1 -U admin -d historia_clinica"]}
+            periodSeconds: 3
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            exec: {command: [sh, -c, "pg_isready -h 127.0.0.1 -U admin -d historia_clinica"]}
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {memory: 384Mi}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: db-init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+      volumes:
+        - name: db-init
+          configMap:
+            name: db-init
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 1Gi}}

@@ -1,0 +1,88 @@
+# API v2 de la sede. Dos réplicas: matar un pod no interrumpe el servicio.
+# Readiness depende de la base de la sede (no de FHIR): si la base cae, el
+# pod sale del Service y el gateway manda las lecturas a otra sede.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: api}
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  template:
+    metadata:
+      labels: {app: api}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: api
+          image: hc-api:local
+          imagePullPolicy: Never        # se carga en Minikube con `minikube image load`
+          envFrom:
+            - configMapRef: {name: sede-config}
+          env:
+            - {name: DB_HOST, value: pg-local}
+            - {name: DB_PORT, value: "5432"}
+            - {name: DB_NAME, value: historia_clinica}
+            - {name: DB_USER, value: admin}
+            - name: DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: hc-secretos, key: POSTGRES_PASSWORD}}
+            - {name: FHIR_BASE_URL, value: "http://hapi:8080/fhir"}
+            - {name: FHIR_TIMEOUT, value: "45"}
+            # Falla rápido si la base no responde: así el gateway reintenta en otra sede antes de que el cliente se rinda.
+            - {name: DB_CONNECT_TIMEOUT, value: "1"}
+            # Anclaje de la cabeza de la auditoría en las otras sedes (la propia se descarta sola por SEDE_ID).
+            - name: HC_PARES
+              value: "1=http://api.sede-sincelejo.svc.cluster.local:8001,2=http://api.sede-cartagena.svc.cluster.local:8001,3=http://api.sede-corozal.svc.cluster.local:8001"
+            # Secreto de firma de los tokens (igual en las 3 sedes) y hashes de los usuarios del personal.
+            # El Secret `hc-auth` lo crea scripts/k8s_desplegar.sh con scripts/credenciales.py.
+            - name: HC_JWT_SECRETO
+              valueFrom: {secretKeyRef: {name: hc-auth, key: HC_JWT_SECRETO}}
+            - name: HC_USUARIOS_B64
+              valueFrom: {secretKeyRef: {name: hc-auth, key: HC_USUARIOS_B64}}
+          ports: [{name: http, containerPort: 8001}]
+          readinessProbe:
+            httpGet: {path: /api/health, port: http}
+            periodSeconds: 3
+            timeoutSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: {path: /api/health/live, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests: {cpu: 25m, memory: 48Mi}
+            limits: {memory: 160Mi}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: api}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector: {app: api}
+  ports: [{name: http, port: 8001, targetPort: http}]
+---
+# Acceso directo a la API de esta sede desde fuera del clúster (pruebas SRE).
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-ext
+spec:
+  type: NodePort
+  selector: {app: api}
+  ports: [{name: http, port: 8001, targetPort: http}]

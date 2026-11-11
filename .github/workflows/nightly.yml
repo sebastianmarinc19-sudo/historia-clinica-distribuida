@@ -1,0 +1,57 @@
+# Pruebas pesadas que no se corren en cada cambio: failover de punta a punta (Compose) y experimentos SRE (Kubernetes).
+# Corren una vez por semana y a pedido. Los objetivos SRE son umbrales: si una corrida no los cumple, el trabajo queda en rojo.
+name: Nocturno
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"        # lunes 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  failover-compose:
+    name: failover · Docker Compose (32 comprobaciones)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Levantar todo con un solo comando (el servicio init crea claves y certificados)
+        run: docker compose up -d --build
+      - name: Esperar a Sincelejo y su HAPI
+        run: |
+          for _ in $(seq 1 90); do
+            if curl -fsS -m 20 localhost:8101/api/health 2>/dev/null \
+                | python3 -c "import json,sys; sys.exit(0 if json.load(sys.stdin)['fhir']['estado']=='ok' else 1)"; then exit 0; fi
+            sleep 10
+          done
+          exit 1
+      - run: python3 scripts/prueba_failover.py
+      - if: failure()
+        run: docker compose -f docker-compose.yml logs --no-color --tail=150
+      - if: always()
+        run: docker compose -f docker-compose.yml down -v
+
+  sre-kubernetes:
+    name: SRE · experimentos de caos y carga (Kubernetes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: medyagh/setup-minikube@v0.0.18
+        with:
+          driver: docker
+          cpus: 2
+          memory: 4096
+      - run: bash scripts/k8s_desplegar.sh
+      - run: kubectl -n sede-sincelejo rollout status deployment/hapi --timeout=900s
+      - name: Experimentos SRE
+        run: python3 scripts/sre_k8s.py
+      - name: Resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-sre
+          path: docs/resultados_sre.json
+          if-no-files-found: ignore

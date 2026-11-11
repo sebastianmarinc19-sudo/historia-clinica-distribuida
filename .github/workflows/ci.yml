@@ -1,0 +1,117 @@
+# Integración continua: calidad (rápida) -> integración en Docker Compose y en Kubernetes con E2E.
+# Los pasos de calidad son los mismos que se corren en local con `bash scripts/ci.sh`.
+name: CI
+
+on:
+  push:
+    branches: [main, master, "reingenieria-*"]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:          # lo reutiliza cd.yml: no se publica nada que no haya pasado el CI
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calidad:
+    name: calidad · ${{ matrix.paso }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        paso: [lint, hsb, unitarias, sql, manifiestos, secretos]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # gitleaks recorre todo el historial
+      - run: bash scripts/ci.sh ${{ matrix.paso }}
+
+  integracion-compose:
+    name: integración · Docker Compose (3 sedes, TLS, FHIR)
+    needs: calidad
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Levantar todo con un solo comando (el servicio init crea claves y certificados aleatorios)
+        run: docker compose up -d --build
+      - name: Esperar a que Sincelejo y su HAPI respondan
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS -m 20 localhost:8101/api/health 2>/dev/null \
+                | python3 -c "import json,sys; sys.exit(0 if json.load(sys.stdin)['fhir']['estado']=='ok' else 1)"; then
+              echo "listo tras ~$((i*10)) s"; exit 0
+            fi
+            sleep 10
+          done
+          echo "HAPI no respondió a tiempo" >&2; exit 1
+      - name: Pruebas de la API (unitarias, integración, autenticación, MPI, HSB y TLS)
+        run: bash scripts/prueba_api.sh
+      - name: Contrato del HSB con los ejemplos del parcial (HL7 v2, CSV, rechazo y duplicado)
+        run: bash scripts/prueba_hsb_compose.sh
+      - name: Alteración de la auditoría encadenada (UPDATE y DELETE a mano detectados)
+        run: bash scripts/prueba_auditoria.sh compose
+      - name: Evidencia ACID (atomicidad, consistencia, aislamiento y durabilidad con SIGKILL)
+        run: bash scripts/prueba_acid.sh
+      - name: Vistas nuevas con jsdom (reporte de HC y su sello, accesos del paciente, bus, estado)
+        run: bash scripts/prueba_vistas.sh compose
+      - name: Registros de los contenedores si algo falló
+        if: failure()
+        run: docker compose -f docker-compose.yml logs --no-color --tail=150
+      - name: Apagar
+        if: always()
+        run: docker compose -f docker-compose.yml down -v
+
+  kubernetes-e2e:
+    name: integración · Kubernetes (Minikube) y E2E de las vistas
+    needs: calidad
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: medyagh/setup-minikube@v0.0.18
+        with:
+          driver: docker
+          cpus: 2
+          memory: 4096
+      - name: Desplegar las 3 sedes, el gateway con TLS y Prometheus
+        run: bash scripts/k8s_desplegar.sh
+      - name: Esperar al HAPI FHIR de Sincelejo (arranque en frío de varios minutos)
+        run: kubectl -n sede-sincelejo rollout status deployment/hapi --timeout=900s
+      - name: Pruebas de la API contra el clúster
+        run: bash scripts/prueba_api_k8s.sh
+      - name: Guion del HSB (contrato, duplicado, HAPI caído con reintentos, mensaje muerto y reencolado)
+        run: bash scripts/prueba_hsb_vivo.sh --reiniciar
+      - name: Alteración de la auditoría encadenada (UPDATE y DELETE a mano detectados)
+        run: bash scripts/prueba_auditoria.sh k8s
+      - name: Evidencia ACID (atomicidad, consistencia, aislamiento y durabilidad con SIGKILL)
+        run: bash scripts/prueba_acid.sh k8s
+      - name: Vistas nuevas con jsdom (reporte de HC y su sello, accesos del paciente, bus, estado)
+        run: bash scripts/prueba_vistas.sh
+      - name: E2E de las 4 vistas (Chromium)
+        run: bash scripts/prueba_e2e.sh
+      - name: Respaldos programados - respaldo ahora, copia fuera del clúster y restauración verificada
+        run: |
+          bash scripts/respaldos.sh ahora
+          bash scripts/respaldos.sh estado
+          bash scripts/respaldos.sh traer
+          bash scripts/respaldos.sh verificar
+      - name: Capturas de las pruebas E2E que fallaron
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-capturas
+          path: tests/e2e/salida/
+          if-no-files-found: ignore
+      - name: Estado del clúster si algo falló
+        if: failure()
+        run: |
+          kubectl get pods -A
+          for ns in sede-sincelejo sede-cartagena sede-corozal hc-gateway; do
+            kubectl -n "$ns" get events --sort-by=.lastTimestamp | tail -15
+          done

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: sede-sincelejo, labels: {app.kubernetes.io/part-of: historia-clinica}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: sede-cartagena, labels: {app.kubernetes.io/part-of: historia-clinica}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: sede-corozal, labels: {app.kubernetes.io/part-of: historia-clinica}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: hc-gateway, labels: {app.kubernetes.io/part-of: historia-clinica}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: hc-hsb, labels: {app.kubernetes.io/part-of: historia-clinica}}
+---
+apiVersion: v1
+kind: Namespace
+metadata: {name: observabilidad, labels: {app.kubernetes.io/part-of: historia-clinica}}

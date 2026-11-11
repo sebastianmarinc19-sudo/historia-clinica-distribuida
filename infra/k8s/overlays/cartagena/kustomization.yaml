@@ -1,0 +1,31 @@
+# Sede Cartagena (id 2).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: sede-cartagena
+
+resources:
+  - ../../base
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: sede-config
+    literals:
+      - SEDE_ID=2
+      - LOCAL_NAME=cartagena
+      - "PEERS=sincelejo:pg.sede-sincelejo.svc.cluster.local corozal:pg.sede-corozal.svc.cluster.local"
+
+# HAPI FHIR: ~700 MB. En la máquina de laboratorio solo Sincelejo lo tiene
+# activo; las demás sedes degradan a "fhir no disponible" y siguen operando.
+replicas:
+  - name: hapi
+    count: 0
+
+patches:
+  - target: {kind: Service, name: api-ext}
+    patch: |-
+      - op: add
+        path: /spec/ports/0/nodePort
+        value: 30102

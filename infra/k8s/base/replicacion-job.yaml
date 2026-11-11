@@ -1,0 +1,32 @@
+# Crea las suscripciones de esta sede hacia las demás. Reintenta hasta que
+# los pares estén listos (backoffLimit alto, ejecución idempotente).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: replicacion-setup
+spec:
+  backoffLimit: 40
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: setup
+          image: postgres:16-alpine
+          command: [sh, /scripts/configurar_suscripciones.sh]
+          envFrom:
+            - configMapRef: {name: sede-config}
+          env:
+            - {name: POSTGRES_USER, value: admin}
+            - {name: POSTGRES_DB, value: historia_clinica}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: hc-secretos, key: POSTGRES_PASSWORD}}
+            - name: REPLICATION_PASSWORD
+              valueFrom: {secretKeyRef: {name: hc-secretos, key: REPLICATION_PASSWORD}}
+          volumeMounts:
+            - {name: script, mountPath: /scripts, readOnly: true}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 64Mi}
+      volumes:
+        - name: script
+          configMap: {name: replicacion-script}

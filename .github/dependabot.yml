@@ -1,0 +1,15 @@
+# Actualizaciones semanales de dependencias (cada una llega como un PR que pasa por el CI).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /app
+    schedule: {interval: weekly}
+  - package-ecosystem: docker
+    directory: /app
+    schedule: {interval: weekly}
+  - package-ecosystem: docker
+    directory: /tests/e2e
+    schedule: {interval: weekly}
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}

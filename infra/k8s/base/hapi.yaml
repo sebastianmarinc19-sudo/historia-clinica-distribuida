@@ -1,0 +1,51 @@
+# HAPI FHIR de la sede (base fhir_db en el Postgres de la sede).
+# Consume ~800 MB: en la máquina de laboratorio (5,7 GB) solo se activa en
+# una sede a la vez; el overlay de cada sede fija `replicas`.
+# El nombre `hapi` no lleva guion bajo: Tomcat rechaza hosts con '_'.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: hapi}
+  template:
+    metadata:
+      labels: {app: hapi}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /actuator/prometheus
+    spec:
+      containers:
+        - name: hapi
+          image: hapiproject/hapi:v6.8.0
+          env:
+            - {name: JAVA_TOOL_OPTIONS, value: "-Xmx400m -XX:MaxMetaspaceSize=256m"}
+            - {name: spring.datasource.url, value: "jdbc:postgresql://pg-local:5432/fhir_db"}
+            - {name: spring.datasource.username, value: admin}
+            - name: spring.datasource.password
+              valueFrom: {secretKeyRef: {name: hc-secretos, key: POSTGRES_PASSWORD}}
+            - {name: spring.datasource.driverClassName, value: org.postgresql.Driver}
+            - {name: spring.jpa.properties.hibernate.dialect, value: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect}
+            - {name: hapi.fhir.fhir_version, value: R4}
+            - {name: hapi.fhir.allow_external_references, value: "true"}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe:
+            httpGet: {path: /fhir/metadata, port: http}
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {memory: 940Mi}      # (montón 400 MB: con 320 MB el HAPI pasaba el tiempo en recolecciones completas, 698 y 22 % de sobrecarga, y una migración tardaba ~34 s; metaspace 256 MB: con 160 MB el validador `$validate` lo agotaba; sin probar en el clúster) con 720 Mi el kernel lo terminó (OOMKilled) tras unos 10 min de uso sostenido
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hapi
+spec:
+  selector: {app: hapi}
+  ports: [{name: http, port: 8080, targetPort: http}]

@@ -1,0 +1,19 @@
+# Prometheus de Docker Compose (perfil `observabilidad`): recoge las métricas de las tres APIs, el bus, el gateway y el HAPI de Sincelejo.
+# En Kubernetes lo hace infra/k8s/observabilidad/prometheus.yaml por anotaciones de los pods.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: api-sedes
+    static_configs:
+      - targets: [api_sincelejo:8001, api_cartagena:8001, api_corozal:8001]
+  - job_name: hsb
+    static_configs:
+      - targets: [hsb:8000]
+  - job_name: gateway
+    static_configs:
+      - targets: [gateway_metricas:9113]
+  - job_name: hapi
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [hapi-sincelejo:8080]      # alias de red: Tomcat rechaza nombres de host con «_»

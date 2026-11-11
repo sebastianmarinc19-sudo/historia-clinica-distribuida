@@ -1,0 +1,69 @@
+# Respaldo programado de la sede: pg_dump de sus bases + roles, cifrado con una clave PÚBLICA (el clúster no tiene la privada),
+# a un volumen propio y, si se configura, también fuera del clúster (rclone). Ver infra/backup/respaldar.sh y scripts/respaldos.sh.
+#
+# Protege de errores lógicos (un DELETE equivocado también se replica a las 3 sedes) y de la pérdida de datos de una sede.
+# OJO: el volumen vive en el mismo clúster/nodo que la base; solo la copia FUERA del clúster protege de perder el nodo.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: respaldos
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: respaldo
+spec:
+  schedule: "0 2 * * *"                  # todos los días 02:00 UTC (21:00 en Colombia)
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels: {app: respaldo}
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels: {app: respaldo}
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 70                # usuario postgres de la imagen
+            runAsGroup: 70
+            fsGroup: 70
+          containers:
+            - name: respaldo
+              image: hc-backup:local
+              imagePullPolicy: Never     # se carga en Minikube con `minikube image load`
+              command: ["/usr/local/bin/respaldar.sh"]
+              envFrom:
+                - configMapRef: {name: sede-config}                       # LOCAL_NAME
+                - secretRef: {name: hc-respaldo, optional: true}          # RESPALDO_RECIPIENT (clave pública age)
+                - secretRef: {name: hc-respaldo-remoto, optional: true}   # RESPALDO_REMOTO y RCLONE_CONFIG_* (opcional)
+              env:
+                - {name: PGHOST, value: pg-local}
+                - {name: PGUSER, value: admin}
+                - name: PGPASSWORD
+                  valueFrom: {secretKeyRef: {name: hc-secretos, key: POSTGRES_PASSWORD}}
+                - {name: HOME, value: /tmp}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: {drop: [ALL]}
+              resources:
+                requests: {cpu: 20m, memory: 32Mi}
+                limits: {memory: 192Mi}
+              volumeMounts:
+                - {name: respaldos, mountPath: /respaldos}
+                - {name: tmp, mountPath: /tmp}
+          volumes:
+            - name: respaldos
+              persistentVolumeClaim: {claimName: respaldos}
+            - name: tmp
+              emptyDir: {}
