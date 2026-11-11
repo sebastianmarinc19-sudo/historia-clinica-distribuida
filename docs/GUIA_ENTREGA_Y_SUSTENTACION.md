@@ -7,7 +7,7 @@ Esta guía es una lista de pasos, no un historial inventado: **los commits, las 
 
 Estado al escribir esto: el trabajo está **sin commit** y `origin` apunta al repositorio del docente (no se le hace push).
 
-1. Cree su repositorio **privado** y dé acceso de lectura al docente. En el clon local: `git remote rename origin docente` (o bórrelo) y `git remote add origin <su-repo>`. No haga push al del docente.
+1. Cree su repositorio **público** (el equipo decidió que sea público; el proyecto solo usa datos sintéticos y `gitleaks` no encontró secretos, pero revise `git ls-files` antes de subir). En el clon local: `git remote rename origin docente` (o bórrelo) y `git remote add origin <su-repo>`. No haga push al del docente.
 2. Cada integrante configura su propia identidad **en su propia máquina o cuenta**: `git config user.name "..."` y `git config user.email "..."`.
 3. Haga commits con lo que cada uno hizo de verdad. Si hasta ahora todo se hizo en una sola copia de trabajo, no reparta commits para aparentar otra cosa ni cambie fechas: haga el commit inicial tal cual está y, desde ahí, que **cada uno haga commits reales** (revisión del código que va a sustentar, correcciones, roles en el README, contribución en la bitácora, ensayo de la demo). La bitácora ya declara el uso de IA y que el trabajo está sin commit.
 4. Una forma ordenada de agrupar por fase, si le sirve (decida usted qué commit hace cada quien según quién trabajó en qué):

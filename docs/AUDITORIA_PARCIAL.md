@@ -106,7 +106,7 @@ documentado y mostrado en la demo, y explicarlo en la sustentación.
 | Guion de la demostración | ✅ `scripts/demo.sh` (los 7 pasos de la lista de verificación de la guía) |
 | Objetivos específicos 3 a 4 | ✅ 4 |
 | Cuenta `auditor` (la guía pide roles paciente, admisionista, médico y auditor) | ✅ usuario `auditor` con rol `reportero` |
-| Etiqueta `v1.0` y repositorio privado con acceso al docente | ⏳ Lo hace el equipo en su propio repositorio (`git tag -a v1.0`); yo no toco remotos |
+| Etiqueta `v1.0` y repositorio público | ⏳ Lo hace el equipo en su propio repositorio (`git tag -a v1.0`); yo no toco remotos |
 | Sustentación individual (explicar y modificar en vivo) | ⏳ Cada integrante: recorrido sugerido en la bitácora |
 
 ## 7. Decisiones que cambian el plan

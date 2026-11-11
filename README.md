@@ -11,10 +11,10 @@ Reingeniería del proyecto para que **tres sedes (Sincelejo, Cartagena y Corozal
 | Sebastián Marín | _por completar por el equipo_ |
 | Halit Tuiran | _por completar por el equipo_ |
 
-Docente: Jaider Reyes · Sistemas Distribuidos · Corporación Universitaria Antonio José de Sucre (UAJS). Repositorio privado con acceso al docente: _URL por completar_. Versión entregada: etiqueta **`v1.0`**
+Docente: Jaider Reyes · Sistemas Distribuidos · Corporación Universitaria Antonio José de Sucre (UAJS). Repositorio público: https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida (rama `reingenieria-3-sedes`). Versión entregada: etiqueta **`v1.0`**
 (`git tag -a v1.0 -m "Entrega final" && git push origin v1.0`, hecho por el equipo en su propio repositorio). La contribución de cada integrante y el uso declarado de IA y de código abierto están en la **[bitácora](docs/BITACORA.md)**.
 
-Para lo que solo puede hacer el equipo (commits reales de ambos, repositorio privado, etiqueta `v1.0`, ensayo de la demostración y preparación de la sustentación individual) hay una lista de pasos en **[docs/GUIA_ENTREGA_Y_SUSTENTACION.md](docs/GUIA_ENTREGA_Y_SUSTENTACION.md)**.
+Para lo que solo puede hacer el equipo (commits reales de ambos, repositorio público, etiqueta `v1.0`, ensayo de la demostración y preparación de la sustentación individual) hay una lista de pasos en **[docs/GUIA_ENTREGA_Y_SUSTENTACION.md](docs/GUIA_ENTREGA_Y_SUSTENTACION.md)**.
 
 ## Ejecución desde cero (solo Docker)
 
