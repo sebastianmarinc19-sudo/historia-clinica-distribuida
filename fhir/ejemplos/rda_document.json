@@ -1,0 +1,322 @@
+{
+  "resourceType": "Bundle",
+  "type": "document",
+  "identifier": {
+    "system": "https://hc.uajs.edu.co/fhir/id/rda",
+    "value": "0471c0e3-efcd-4b30-8df2-cd550d621559"
+  },
+  "timestamp": "2026-11-09T17:39:46.241591+00:00",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:dc2718c5-d980-5a42-8d77-1dc59bf13bac",
+      "resource": {
+        "resourceType": "Composition",
+        "id": "dc2718c5-d980-5a42-8d77-1dc59bf13bac",
+        "status": "final",
+        "type": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "34133-9",
+              "display": "Summarization of episode note"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:61ab3b6f-7441-4552-9f6f-5d3b3703d9df"
+        },
+        "encounter": {
+          "reference": "urn:uuid:0471c0e3-efcd-4b30-8df2-cd550d621559"
+        },
+        "date": "2026-03-15T09:30:00-05:00",
+        "author": [
+          {
+            "display": "Sede Sincelejo"
+          }
+        ],
+        "title": "Reporte de Detalle de Atención (RDA)",
+        "section": [
+          {
+            "title": "Diagnósticos",
+            "entry": [
+              {
+                "reference": "urn:uuid:1da65dd3-2d5c-42fc-811d-3264bbe48490"
+              }
+            ]
+          },
+          {
+            "title": "Medicación",
+            "entry": [
+              {
+                "reference": "urn:uuid:3583408a-b232-471b-8428-99fe24ecc70c"
+              }
+            ]
+          },
+          {
+            "title": "Procedimientos",
+            "entry": [
+              {
+                "reference": "urn:uuid:0ecf4dff-ed6f-4472-8499-b0a5c5dc439d"
+              }
+            ]
+          },
+          {
+            "title": "Resultados",
+            "entry": [
+              {
+                "reference": "urn:uuid:171a01ac-4f88-44ea-95c2-056051eb3931"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:61ab3b6f-7441-4552-9f6f-5d3b3703d9df",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "61ab3b6f-7441-4552-9f6f-5d3b3703d9df",
+        "identifier": [
+          {
+            "system": "https://hc.uajs.edu.co/fhir/id/cc",
+            "value": "1001234567"
+          }
+        ],
+        "name": [
+          {
+            "use": "official",
+            "family": "Torres Pacheco",
+            "given": [
+              "Ana"
+            ]
+          }
+        ],
+        "gender": "female",
+        "birthDate": "1992-04-12",
+        "_birthDate": {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/patient-birthTime",
+              "valueDateTime": "1992-04-12T10:00:00-05:00"
+            }
+          ]
+        },
+        "address": [
+          {
+            "use": "home",
+            "city": "70001",
+            "country": "COL"
+          }
+        ],
+        "extension": [
+          {
+            "url": "https://hc.uajs.edu.co/fhir/StructureDefinition/etnia",
+            "valueCode": "06"
+          },
+          {
+            "url": "https://hc.uajs.edu.co/fhir/StructureDefinition/oposicion-donacion",
+            "valueBoolean": false
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0471c0e3-efcd-4b30-8df2-cd550d621559",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "0471c0e3-efcd-4b30-8df2-cd550d621559",
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "EMER"
+        },
+        "subject": {
+          "reference": "urn:uuid:61ab3b6f-7441-4552-9f6f-5d3b3703d9df"
+        },
+        "period": {
+          "start": "2026-03-15T08:30:00-05:00",
+          "end": "2026-03-15T09:30:00-05:00"
+        },
+        "reasonCode": [
+          {
+            "coding": [
+              {
+                "system": "https://hc.uajs.edu.co/fhir/id/causa-atencion",
+                "code": "01"
+              }
+            ]
+          }
+        ],
+        "serviceProvider": {
+          "identifier": {
+            "system": "https://hc.uajs.edu.co/fhir/id/prestador",
+            "value": "700010000001"
+          }
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:1da65dd3-2d5c-42fc-811d-3264bbe48490",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "1da65dd3-2d5c-42fc-811d-3264bbe48490",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+                "code": "encounter-diagnosis"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/icd-10",
+              "code": "J00",
+              "display": "Rinofaringitis"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:61ab3b6f-7441-4552-9f6f-5d3b3703d9df"
+        },
+        "encounter": {
+          "reference": "urn:uuid:0471c0e3-efcd-4b30-8df2-cd550d621559"
+        },
+        "recordedDate": "2026-03-15",
+        "extension": [
+          {
+            "url": "https://hc.uajs.edu.co/fhir/StructureDefinition/rol-diagnostico",
+            "valueCode": "IN"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:3583408a-b232-471b-8428-99fe24ecc70c",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "3583408a-b232-471b-8428-99fe24ecc70c",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "https://hc.uajs.edu.co/fhir/id/cum",
+              "code": "19938",
+              "display": "Acetaminofén"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:61ab3b6f-7441-4552-9f6f-5d3b3703d9df"
+        },
+        "encounter": {
+          "reference": "urn:uuid:0471c0e3-efcd-4b30-8df2-cd550d621559"
+        },
+        "authoredOn": "2026-03-15T08:45:00-05:00",
+        "dosageInstruction": [
+          {
+            "doseAndRate": [
+              {
+                "doseQuantity": {
+                  "value": 500.0,
+                  "unit": "mg",
+                  "system": "http://unitsofmeasure.org",
+                  "code": "mg"
+                }
+              }
+            ],
+            "route": {
+              "coding": [
+                {
+                  "system": "https://hc.uajs.edu.co/fhir/id/via-administracion",
+                  "code": "01"
+                }
+              ]
+            },
+            "timing": {
+              "repeat": {
+                "frequency": 1,
+                "period": 8,
+                "periodUnit": "h"
+              }
+            }
+          }
+        ],
+        "dispenseRequest": {
+          "expectedSupplyDuration": {
+            "value": 5.0,
+            "unit": "d",
+            "system": "http://unitsofmeasure.org",
+            "code": "d"
+          }
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:0ecf4dff-ed6f-4472-8499-b0a5c5dc439d",
+      "resource": {
+        "resourceType": "Procedure",
+        "id": "0ecf4dff-ed6f-4472-8499-b0a5c5dc439d",
+        "status": "completed",
+        "code": {
+          "coding": [
+            {
+              "system": "https://hc.uajs.edu.co/fhir/id/tecnologia-salud",
+              "code": "890201",
+              "display": "Consulta"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:61ab3b6f-7441-4552-9f6f-5d3b3703d9df"
+        },
+        "encounter": {
+          "reference": "urn:uuid:0471c0e3-efcd-4b30-8df2-cd550d621559"
+        },
+        "performedDateTime": "2026-03-15T08:40:00-05:00"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:171a01ac-4f88-44ea-95c2-056051eb3931",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "171a01ac-4f88-44ea-95c2-056051eb3931",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8310-5",
+              "display": "Temperatura corporal"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:61ab3b6f-7441-4552-9f6f-5d3b3703d9df"
+        },
+        "encounter": {
+          "reference": "urn:uuid:0471c0e3-efcd-4b30-8df2-cd550d621559"
+        },
+        "effectiveDateTime": "2026-03-15T09:10:00-05:00",
+        "valueQuantity": {
+          "value": 38.5,
+          "unit": "C",
+          "system": "http://unitsofmeasure.org",
+          "code": "Cel"
+        }
+      }
+    }
+  ]
+}

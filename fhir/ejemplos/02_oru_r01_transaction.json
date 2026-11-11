@@ -1,0 +1,121 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "Patient/pac-1001",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "pac-1001",
+        "identifier": [
+          {
+            "system": "https://hc.local/sid/documento",
+            "value": "1001"
+          }
+        ],
+        "name": [
+          {
+            "family": "Perez",
+            "given": [
+              "Carlos"
+            ]
+          }
+        ],
+        "gender": "male",
+        "birthDate": "1980-04-12"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Patient/pac-1001"
+      }
+    },
+    {
+      "fullUrl": "Practitioner/med-MED-01",
+      "resource": {
+        "resourceType": "Practitioner",
+        "id": "med-MED-01",
+        "identifier": [
+          {
+            "value": "MED-01"
+          }
+        ],
+        "name": [
+          {
+            "family": "Vega",
+            "given": [
+              "Laura"
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Practitioner/med-MED-01"
+      }
+    },
+    {
+      "fullUrl": "Encounter/enc-1-V-S1-0150",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "enc-1-V-S1-0150",
+        "status": "in-progress",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "EMER",
+          "display": "emergency"
+        },
+        "subject": {
+          "reference": "Patient/pac-1001"
+        },
+        "period": {
+          "start": "2026-11-07T11:00:00-05:00"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "Practitioner/med-MED-01"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Encounter/enc-1-V-S1-0150"
+      }
+    },
+    {
+      "fullUrl": "Observation/obs-MSG-0002-1",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-MSG-0002-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "718-7",
+              "display": "Hemoglobina"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/pac-1001"
+        },
+        "encounter": {
+          "reference": "Encounter/enc-1-V-S1-0150"
+        },
+        "effectiveDateTime": "2026-11-07T11:00:00-05:00",
+        "valueQuantity": {
+          "value": 13.8,
+          "unit": "g/dL",
+          "system": "http://unitsofmeasure.org",
+          "code": "g/dL"
+        }
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Observation/obs-MSG-0002-1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Historia clínica distribuida · Inicio</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main>
+  <h2>Historia clínica distribuida interoperable</h2>
+  <p class="sub">Cuatro vistas para verificar los casos de uso CU-01 a CU-15. Esta página la sirve la sede indicada arriba;
+    lo que se registra aquí lo escribe esta sede y se replica a las demás.</p>
+  <div class="tarjetas-inicio" id="tarjetas"></div>
+  <div class="tarjeta" style="margin-top:18px">
+    <h3>Cómo se relacionan las sedes</h3>
+    <p>Cada sede es dueña de las filas que crea y recibe una copia de solo lectura de las de las otras. Si una sede
+      cae o queda aislada, las demás siguen mostrando su historia y la sede aislada sigue registrando lo suyo;
+      al volver, todo se sincroniza solo.</p>
+    <div id="sedes" class="fila-botones"></div>
+  </div>
+</main>
+<script src="comun.js"></script>
+<script type="module">
+const info = [
+  { v: 'admision', rol: 'Admisionista', t: 'Admisionista', d: 'Registra al paciente, abre el encuentro y hace el triage.', cu: ['CU-01', 'CU-02', 'CU-03'] },
+  { v: 'medico', rol: 'Médico', t: 'Médico', d: 'Atiende: diagnósticos, tecnologías, resultados, egreso, migración a FHIR e historia entre sedes.',
+    cu: ['CU-04', 'CU-05', 'CU-06', 'CU-07', 'CU-08', 'CU-09', 'CU-10', 'CU-11', 'CU-12', 'CU-13'] },
+  { v: 'paciente', rol: 'Documento y fecha de nacimiento', t: 'Paciente', d: 'Consulta su propia historia clínica en cualquier sede donde haya sido atendido, solo lectura.', cu: ['CU-12', 'CU-13'] },
+  { v: 'reportes', rol: 'Reportero', t: 'Reportero', d: 'Cobertura de migración a FHIR, auditoría de los 57 campos y estado de la réplica.', cu: ['CU-14', 'CU-15'] },
+];
+await cabecera('inicio');
+const cont = $('#tarjetas');
+for (const x of info)
+  cont.append(h('a', { href: x.v + '.html' }, h('div', { class: 'tarjeta' },
+    h('h3', {}, 'Vista del ' + x.t), h('p', { class: 'sub', style: 'margin:0' }, x.d),
+    h('div', { class: 'cu' }, x.cu.map((c) => insignia(c, 'info'))),
+    h('div', { class: 'sub', style: 'margin:8px 0 0' }, 'Ingreso: ', x.rol))));
+api('/sede').then((d) => {
+  $('#sedes').append(...d.sedes.map((s) => insignia(`${s.id_sede} · ${s.nombre_ciudad}` + (s.id_sede === d.sede_local ? ' (esta sede)' : ''),
+    s.id_sede === d.sede_local ? 'ok' : 'neutro')));
+}).catch(() => {});
+</script>
+</body>
+</html>

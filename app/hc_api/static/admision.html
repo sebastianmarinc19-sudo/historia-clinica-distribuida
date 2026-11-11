@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vista del Admisionista · Historia clínica distribuida</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main>
+  <h2>Vista del Admisionista</h2>
+  <p class="sub">CU-01 Registrar paciente · CU-02 Abrir el encuentro · CU-03 Registrar triage</p>
+
+  <section class="tarjeta" aria-labelledby="t-buscar">
+    <h3 id="t-buscar">1. Buscar al paciente</h3>
+    <p class="sub" style="margin-top:0">La búsqueda recorre la copia local de las tres sedes: si ya fue atendido en otra sede, sus datos se reutilizan.</p>
+    <form id="f-buscar" class="rejilla" autocomplete="off"></form>
+    <div id="m-buscar"></div>
+    <div id="r-buscar"></div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-paciente">
+    <h3 id="t-paciente">2. Datos del paciente (CU-01)</h3>
+    <form id="f-paciente" autocomplete="off"></form>
+    <div id="m-paciente"></div>
+  </section>
+
+  <section class="tarjeta" id="s-encuentro" aria-labelledby="t-encuentro">
+    <h3 id="t-encuentro">3. Abrir encuentro (CU-02)</h3>
+    <div id="aviso-encuentro" class="vacio">Primero registre o seleccione a un paciente de esta sede.</div>
+    <form id="f-encuentro" autocomplete="off" hidden></form>
+    <div id="m-encuentro"></div>
+  </section>
+
+  <section class="tarjeta" id="s-triage" aria-labelledby="t-triage">
+    <h3 id="t-triage">4. Triage (CU-03)</h3>
+    <div id="aviso-triage" class="vacio">Disponible cuando haya un encuentro abierto.</div>
+    <form id="f-triage" class="rejilla" autocomplete="off" hidden></form>
+    <div id="m-triage"></div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-bus">
+    <h3 id="t-bus">Mensajes del bus de integración (HL7 v2 y CSV)</h3>
+    <p class="sub" style="margin-top:0">Lo que los sistemas de las sedes enviaron al bus y en qué estado va cada mensaje. «Reintentando» se entrega solo cuando el destino se recupera;
+      «rechazado» trae el motivo y hay que corregir el dato en el sistema que lo envió; «muerto» agotó los intentos y lo reencola un administrador.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:8px">
+      <div><label for="bus-estado">Estado</label>
+        <select id="bus-estado"><option value="">Todos</option><option>recibido</option><option>validado</option><option>transformado</option>
+          <option>entregado</option><option>rechazado</option><option>reintentando</option><option>muerto</option></select></div>
+      <button type="button" class="sec" id="bus-refrescar">Actualizar</button>
+    </div>
+    <div id="bus-resumen" class="sub"></div>
+    <div id="bus-tabla" aria-live="polite"></div>
+  </section>
+</main>
+<script src="comun.js"></script>
+<script type="module">
+await cabecera('admision', ['admisionista']);
+const estado = { paciente: null, encuentro: null };
+
+/* ---------- 1. Búsqueda ---------- */
+const fBuscar = $('#f-buscar');
+const selTipoBusq = h('select', { id: 'b-tipo', required: true });
+const inpNumBusq = h('input', { id: 'b-num', required: true, placeholder: 'Número de documento' });
+vaciar(fBuscar).append(campo('Tipo de documento', selTipoBusq), campo('Número de documento', inpNumBusq),
+  h('div', { style: 'align-self:end' }, h('button', { type: 'submit' }, 'Buscar')));
+llenarSelect(selTipoBusq, 'tipo_documento', { vacio: 'Tipo…' }).then(() => { selTipoBusq.value = 'CC'; });
+
+fBuscar.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  limpiar('#m-buscar');
+  try {
+    const r = await api('/pacientes/buscar', { params: { cod_tipo_documento: selTipoBusq.value, numero_documento: inpNumBusq.value.trim() } });
+    const cont = vaciar($('#r-buscar'));
+    if (!r.total) { mostrar('#m-buscar', 'info', 'No hay registros con ese documento en ninguna sede. Complete el formulario para registrarlo.'); precargarNuevo(); return; }
+    cont.append(tabla([
+      { t: 'Paciente', f: (p) => nombreCompleto(p) },
+      { t: 'Nacimiento', f: (p) => fmtDia(p.fecha_hora_nacimiento) },
+      { t: 'Sede del registro', f: (p) => insignia(p._sede_nombre + (p._id_sede === SEDE_LOCAL ? ' (esta sede)' : ' (réplica)'), p._id_sede === SEDE_LOCAL ? 'ok' : 'aviso') },
+      { t: 'FHIR', f: (p) => insignia(p.fhir_patient_id ? 'migrado' : 'pendiente', p.fhir_patient_id ? 'ok' : 'neutro') },
+      { t: '', f: (p) => h('button', { class: 'sec', type: 'button', onclick: () => seleccionar(p) },
+          p._id_sede === SEDE_LOCAL ? 'Usar este registro' : 'Registrar en esta sede con estos datos') },
+    ], r.pacientes));
+    const local = r.pacientes.find((p) => p._id_sede === SEDE_LOCAL);
+    if (local) seleccionar(local, true);
+  } catch (e) { mostrar('#m-buscar', 'mal', e.message); }
+});
+
+let SEDE_LOCAL = null;
+api('/sede').then((d) => { SEDE_LOCAL = d.sede_local; });
+
+function precargarNuevo() {
+  $('#p-tipo').value = selTipoBusq.value; $('#p-num').value = inpNumBusq.value.trim();
+  estado.paciente = null; actualizarEncuentro();
+}
+
+function seleccionar(p, silencioso) {
+  rellenarPaciente(p);
+  if (p._id_sede === SEDE_LOCAL) {
+    estado.paciente = p;
+    if (!silencioso) mostrar('#m-paciente', 'ok', `Paciente seleccionado: ${nombreCompleto(p)}.`);
+  } else {
+    estado.paciente = null;
+    mostrar('#m-paciente', 'aviso', `Datos copiados desde la sede ${p._sede_nombre}. Revíselos y pulse «Guardar paciente» para registrarlo también en esta sede.`);
+  }
+  actualizarEncuentro();
+}
+
+/* ---------- 2. Paciente ---------- */
+const fPac = $('#f-paciente');
+const C = {};   // controles por nombre
+function ctl(nombre, etiqueta, nodo) { C[nombre] = nodo; return campo(etiqueta, nodo); }
+const sel = (id) => h('select', { id });
+vaciar(fPac).append(
+  h('div', { class: 'rejilla' },
+    ctl('cod_tipo_documento', 'Tipo de documento *', Object.assign(sel('p-tipo'), { required: true })),
+    ctl('numero_documento', 'Número de documento *', h('input', { id: 'p-num', required: true, maxlength: 20 })),
+    ctl('primer_nombre', 'Primer nombre *', h('input', { required: true, maxlength: 50 })),
+    ctl('segundo_nombre', 'Segundo nombre', h('input', { maxlength: 50 })),
+    ctl('primer_apellido', 'Primer apellido *', h('input', { required: true, maxlength: 50 })),
+    ctl('segundo_apellido', 'Segundo apellido', h('input', { maxlength: 50 })),
+    ctl('fecha_hora_nacimiento', 'Fecha y hora de nacimiento *', h('input', { type: 'datetime-local', required: true })),
+    ctl('cod_sexo', 'Sexo biológico *', Object.assign(sel('p-sexo'), { required: true })),
+    ctl('cod_identidad_genero', 'Identidad de género', sel('p-genero')),
+    ctl('cod_pais_nacionalidad', 'País de nacionalidad', sel('p-nac')),
+    ctl('cod_pais_residencia', 'País de residencia *', Object.assign(sel('p-res'), { required: true })),
+    ctl('cod_municipio_residencia', 'Municipio de residencia', sel('p-mun')),
+    ctl('cod_zona_territorial', 'Zona territorial', sel('p-zona')),
+    ctl('cod_etnia', 'Etnia', sel('p-etnia')),
+    ctl('cod_comunidad_etnica', 'Comunidad étnica', sel('p-com')),
+    ctl('cod_categoria_discapacidad', 'Categoría de discapacidad', sel('p-disc'))),
+  h('div', { class: 'rejilla', style: 'margin-top:10px' },
+    h('label', { class: 'check' }, C.oposicion_donacion = h('input', { type: 'checkbox' }), 'Oposición a la presunción legal de donación'),
+    h('label', { class: 'check' }, C.tiene_voluntad_anticipada = h('input', { type: 'checkbox' }), 'Tiene documento de voluntad anticipada')),
+  h('div', { class: 'fila-botones' }, h('button', { type: 'submit' }, 'Guardar paciente'),
+    h('button', { type: 'button', class: 'sec', onclick: () => { fPac.reset(); estado.paciente = null; actualizarEncuentro(); limpiar('#m-paciente'); } }, 'Limpiar')));
+
+(async () => {
+  await Promise.all([
+    llenarSelect(C.cod_tipo_documento, 'tipo_documento', { vacio: 'Tipo…' }),
+    llenarSelect(C.cod_sexo, 'sexo_biologico', { vacio: 'Sexo…' }),
+    llenarSelect(C.cod_identidad_genero, 'identidad_genero', { vacio: '— (opcional)' }),
+    llenarSelect(C.cod_pais_nacionalidad, 'pais', { vacio: '— (opcional)' }),
+    llenarSelect(C.cod_pais_residencia, 'pais', { vacio: 'País…' }),
+    llenarSelect(C.cod_municipio_residencia, 'municipio', { vacio: '— (opcional)' }),
+    llenarSelect(C.cod_zona_territorial, 'zona_territorial', { vacio: '— (opcional)' }),
+    llenarSelect(C.cod_etnia, 'etnia', { vacio: '— (opcional)' }),
+    llenarSelect(C.cod_categoria_discapacidad, 'categoria_discapacidad', { vacio: '— ninguna' }),
+  ]);
+  C.cod_pais_residencia.value = 'COL';
+  await filtrarComunidades();
+})();
+
+/* La comunidad étnica depende de la etnia (FK compuesta del modelo). */
+async function filtrarComunidades(valor) {
+  const etnia = C.cod_etnia.value;
+  const todas = await catalogo('comunidad_etnica');
+  vaciar(C.cod_comunidad_etnica).append(h('option', { value: '' }, etnia ? '— (opcional)' : 'Seleccione primero la etnia'));
+  for (const c of todas.filter((x) => x.cod_etnia === etnia)) C.cod_comunidad_etnica.append(h('option', { value: c.codigo }, `${c.codigo} · ${c.descripcion}`));
+  if (valor) C.cod_comunidad_etnica.value = valor;
+}
+C.cod_etnia.addEventListener('change', () => filtrarComunidades());
+
+function rellenarPaciente(p) {
+  for (const k of ['cod_tipo_documento', 'numero_documento', 'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
+      'cod_sexo', 'cod_identidad_genero', 'cod_pais_nacionalidad', 'cod_pais_residencia', 'cod_municipio_residencia',
+      'cod_zona_territorial', 'cod_etnia', 'cod_categoria_discapacidad']) C[k].value = p[k] ?? '';
+  C.fecha_hora_nacimiento.value = (p.fecha_hora_nacimiento || '').slice(0, 16);
+  C.oposicion_donacion.checked = !!p.oposicion_donacion;
+  C.tiene_voluntad_anticipada.checked = !!p.tiene_voluntad_anticipada;
+  filtrarComunidades(p.cod_comunidad_etnica);
+}
+
+fPac.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const v = (k) => (C[k].value.trim() === '' ? null : C[k].value.trim());
+  const cuerpo = {
+    cod_tipo_documento: C.cod_tipo_documento.value, numero_documento: C.numero_documento.value.trim(),
+    primer_nombre: C.primer_nombre.value.trim(), segundo_nombre: v('segundo_nombre'),
+    primer_apellido: C.primer_apellido.value.trim(), segundo_apellido: v('segundo_apellido'),
+    fecha_hora_nacimiento: aIso(C.fecha_hora_nacimiento.value), cod_sexo: C.cod_sexo.value,
+    cod_identidad_genero: v('cod_identidad_genero'), cod_pais_nacionalidad: v('cod_pais_nacionalidad'),
+    cod_pais_residencia: C.cod_pais_residencia.value, cod_municipio_residencia: v('cod_municipio_residencia'),
+    cod_zona_territorial: v('cod_zona_territorial'), cod_etnia: v('cod_etnia'),
+    cod_comunidad_etnica: v('cod_comunidad_etnica'), cod_categoria_discapacidad: v('cod_categoria_discapacidad'),
+    oposicion_donacion: C.oposicion_donacion.checked, tiene_voluntad_anticipada: C.tiene_voluntad_anticipada.checked,
+  };
+  try {
+    const r = await api('/pacientes', { metodo: 'POST', cuerpo });
+    estado.paciente = { ...r.paciente, _id_sede: SEDE_LOCAL };
+    mostrar('#m-paciente', 'ok', `Paciente ${r.accion}: ${nombreCompleto(r.paciente)} (id ${r.paciente.id_paciente.slice(0, 8)}…). ` +
+      'Queda pendiente de migrar a FHIR y se replica a las demás sedes.');
+    actualizarEncuentro();
+  } catch (e) { mostrar('#m-paciente', 'mal', e.message); }
+});
+
+/* ---------- 3. Encuentro ---------- */
+const fEnc = $('#f-encuentro');
+const E = {};
+function ectl(n, et, nodo) { E[n] = nodo; return campo(et, nodo); }
+vaciar(fEnc).append(
+  h('div', { class: 'rejilla' },
+    ectl('fecha_hora_inicio', 'Fecha y hora de inicio *', h('input', { type: 'datetime-local', required: true })),
+    ectl('cod_modalidad', 'Modalidad *', Object.assign(h('select'), { required: true })),
+    ectl('cod_grupo_servicio', 'Grupo de servicios *', Object.assign(h('select'), { required: true })),
+    ectl('cod_entorno', 'Entorno de atención *', Object.assign(h('select'), { required: true })),
+    ectl('cod_via_ingreso', 'Vía de ingreso *', Object.assign(h('select'), { required: true })),
+    ectl('cod_causa_atencion', 'Causa que motiva la atención *', Object.assign(h('select'), { required: true })),
+    ectl('cod_ocupacion', 'Ocupación', h('select')),
+    ectl('cod_entidad_responsable', 'Entidad responsable del plan *', Object.assign(h('select'), { required: true }))),
+  h('div', { class: 'fila-botones' }, h('button', { type: 'submit' }, 'Abrir encuentro')));
+Promise.all([
+  llenarSelect(E.cod_modalidad, 'modalidad_atencion'), llenarSelect(E.cod_grupo_servicio, 'grupo_servicio'),
+  llenarSelect(E.cod_entorno, 'entorno_atencion'), llenarSelect(E.cod_via_ingreso, 'via_ingreso'),
+  llenarSelect(E.cod_causa_atencion, 'causa_atencion'), llenarSelect(E.cod_ocupacion, 'ocupacion', { vacio: '— (opcional)' }),
+  llenarSelect(E.cod_entidad_responsable, 'entidad_responsable'),
+]).then(() => { E.cod_modalidad.value = '01'; E.cod_grupo_servicio.value = '01'; E.cod_entorno.value = '01'; E.cod_via_ingreso.value = '01'; E.cod_causa_atencion.value = '01'; });
+E.fecha_hora_inicio.value = ahoraLocal();
+
+function actualizarEncuentro() {
+  const hay = !!estado.paciente;
+  fEnc.hidden = !hay;
+  $('#aviso-encuentro').hidden = hay;
+  $('#s-encuentro').classList.toggle('resaltada', hay && !estado.encuentro);
+  if (!hay) { estado.encuentro = null; actualizarTriage(); }
+}
+fEnc.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  try {
+    const cuerpo = { id_paciente: estado.paciente.id_paciente, fecha_hora_inicio: aIso(E.fecha_hora_inicio.value) };
+    for (const k of ['cod_modalidad', 'cod_grupo_servicio', 'cod_entorno', 'cod_via_ingreso', 'cod_causa_atencion', 'cod_entidad_responsable']) cuerpo[k] = E[k].value;
+    cuerpo.cod_ocupacion = E.cod_ocupacion.value || null;
+    const r = await api('/encuentros', { metodo: 'POST', cuerpo });
+    estado.encuentro = r.encuentro;
+    mostrar('#m-encuentro', 'ok', `Encuentro abierto (id ${r.encuentro.id_encuentro.slice(0, 8)}…) en estado ${r.encuentro.estado_migracion}. Continúe con el triage o pase al médico.`);
+    actualizarTriage();
+  } catch (e) { mostrar('#m-encuentro', 'mal', e.message); }
+});
+
+/* ---------- 4. Triage ---------- */
+const fTri = $('#f-triage');
+const T = {};
+vaciar(fTri).append(
+  campo('Fecha y hora del triage *', T.fecha = h('input', { type: 'datetime-local', required: true })),
+  campo('Clasificación *', T.cod = Object.assign(h('select'), { required: true })),
+  h('div', { style: 'align-self:end' }, h('button', { type: 'submit' }, 'Registrar triage')));
+llenarSelect(T.cod, 'clasificacion_triage', { vacio: 'Nivel…' });
+T.fecha.value = ahoraLocal();
+function actualizarTriage() {
+  const hay = !!estado.encuentro;
+  fTri.hidden = !hay; $('#aviso-triage').hidden = hay;
+}
+fTri.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  try {
+    const r = await api(`/encuentros/${estado.encuentro.id_encuentro}/triage`, { metodo: 'POST',
+      cuerpo: { fecha_hora_triage: aIso(T.fecha.value), cod_triage: Number(T.cod.value) } });
+    mostrar('#m-triage', 'ok', `Triage registrado: nivel ${r.triage.cod_triage}.`);
+  } catch (e) { mostrar('#m-triage', 'mal', e.message); }
+});
+
+/* ---------- Mensajes del bus (HSB) ---------- */
+const TIPO_ESTADO = { entregado: 'ok', rechazado: 'mal', muerto: 'mal', reintentando: 'aviso', recibido: 'neutro', validado: 'neutro', transformado: 'neutro' };
+async function cargarBus() {
+  try {
+    const [r, res] = await Promise.all([apiHsb('/mensajes?limite=30' + ($('#bus-estado').value ? '&estado=' + $('#bus-estado').value : '')), apiHsb('/resumen')]);
+    vaciar($('#bus-resumen')).append(`${res.total} mensajes · ` + Object.entries(res.por_estado).filter(([, n]) => n).map(([e, n]) => `${n} ${e}`).join(' · ')
+      + ` · ${res.duplicados_detectados} duplicados detectados`);
+    vaciar($('#bus-tabla')).append(h('div', { style: 'overflow-x:auto' }, tabla([
+      { t: 'Recibido', f: (m) => fmtFecha(m.recibido_en) }, { t: 'Formato', f: (m) => m.formato + (m.tipo && m.tipo.toLowerCase() !== m.formato.toLowerCase() ? ` ${m.tipo}` : '') },
+      { t: 'Sede', f: (m) => m.sede ?? '—' }, { t: 'Documento', f: (m) => m.documento || '—' },
+      { t: 'Estado', f: (m) => insignia(m.estado, TIPO_ESTADO[m.estado] || 'neutro') }, { t: 'Intentos', f: (m) => m.intentos },
+      { t: 'Detalle', f: (m) => (m.motivos && m.motivos.length ? m.motivos.join(' · ') : m.ultimo_error || '') },
+    ], r.mensajes, 'Todavía no se ha recibido ningún mensaje.')));
+  } catch (e) { mostrar($('#bus-tabla'), e.estado === 0 ? 'aviso' : 'mal', e.message); vaciar($('#bus-resumen')); }
+}
+$('#bus-estado').addEventListener('change', cargarBus);
+$('#bus-refrescar').addEventListener('click', cargarBus);
+cargarBus();
+setInterval(cargarBus, 10000);
+</script>
+</body>
+</html>

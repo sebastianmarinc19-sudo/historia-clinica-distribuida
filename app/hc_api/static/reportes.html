@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vista del Reportero · Historia clínica distribuida</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main>
+  <h2>Vista del Reportero · Reporte de HC</h2>
+  <p class="sub">CU-14 Cobertura de migración a FHIR · CU-15 Auditoría de los 57 campos · Estado de la réplica entre sedes.
+    Los datos salen de la copia local, así que el reporte de las tres sedes funciona aunque alguna esté caída.</p>
+
+  <section class="tarjeta" id="s-reporte" aria-labelledby="t-reporte">
+    <h3 id="t-reporte">Reporte de historia clínica de un paciente</h3>
+    <p class="sub" style="margin-top:0">Lo que cada sede registró del paciente, la cobertura de los 57 campos por sede y qué sedes no responden.
+      Sale de la copia local; consultarlo queda registrado en la auditoría (el paciente lo ve en su vista).</p>
+    <form id="f-reporte" class="fila-botones no-imprimir" style="margin:0 0 12px" autocomplete="off"></form>
+    <div id="reporte-hc" aria-live="polite"></div>
+  </section>
+
+  <section class="tarjeta" id="s-estado" aria-labelledby="t-estado">
+    <h3 id="t-estado">Estado de la plataforma</h3>
+    <div id="estado-plataforma" aria-live="polite"></div>
+  </section>
+
+  <section class="tarjeta" id="s-cobertura">
+    <h3>Cobertura de migración a FHIR por sede (CU-14)</h3>
+    <div id="cobertura" class="rejilla"></div>
+    <div id="tabla-cobertura" style="margin-top:12px"></div>
+    <div class="fila-botones"><button type="button" class="sec" id="csv-cobertura">Descargar CSV</button></div>
+  </section>
+
+  <section class="tarjeta" id="s-57">
+    <h3>Auditoría de trazabilidad de los 57 campos (CU-15)</h3>
+    <form id="f-lote" class="fila-botones" style="margin:0 0 12px" autocomplete="off"></form>
+    <div class="pestanas" id="pestanas"></div>
+    <div id="resumen-auditoria"></div>
+    <div class="celdas57" id="celdas" style="margin:12px 0"></div>
+    <details class="plegable"><summary>Ver el detalle campo por campo</summary><div id="detalle-auditoria"></div></details>
+    <div class="fila-botones"><button type="button" class="sec" id="csv-auditoria">Descargar CSV</button>
+      <span class="sub" style="margin:0">Verde: completo · Ámbar: parcial · Rojo: pendiente. Pase el cursor sobre un cuadro para ver el campo.</span></div>
+  </section>
+
+  <section class="tarjeta" id="s-replica">
+    <h3>Estado de la réplica entre sedes</h3>
+    <p class="sub" style="margin-top:0">Cada sede recibe a las otras dos. Una suscripción inactiva significa que esa sede par no está accesible.</p>
+    <div id="replicacion"></div>
+  </section>
+
+  <section class="tarjeta" id="s-integridad">
+    <h3>Integridad de la auditoría (esta sede)</h3>
+    <p class="sub" style="margin-top:0">Cada evento del registro lleva el hash SHA-256 del evento anterior y de su propio contenido. Si alguien modifica, borra o inserta un
+      evento en la base, la cadena deja de cuadrar y aquí se señala el primer evento alterado.</p>
+    <button type="button" id="verificar-auditoria">Verificar la cadena ahora</button>
+    <div id="integridad" aria-live="polite" style="margin-top:10px"></div>
+  </section>
+
+  <section class="tarjeta" id="s-accesos">
+    <h3>Accesos recientes a datos de pacientes (esta sede)</h3>
+    <p class="sub" style="margin-top:0">Registro local de quién consultó o modificó datos y con qué resultado, incluidos los ingresos fallidos.
+      Cada sede guarda el suyo y no se replica; la columna «Sello» es el hash encadenado del evento.</p>
+    <label class="sub" style="display:inline-flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" id="solo-fallos"> Solo intentos rechazados</label>
+    <div id="accesos"></div>
+  </section>
+</main>
+<script src="comun.js"></script>
+<script type="module">
+const ses = await cabecera('reportes', ['reportero', 'medico', 'paciente']);
+const ROL = ses.usuario.rol;
+let COB = null, AUD = null, SEDE_AUD = null, LOTE = '';
+
+/* ---------- CU-14 ---------- */
+async function cargarCobertura() {
+  try {
+    COB = await api('/cobertura');
+    const cont = vaciar($('#cobertura'));
+    for (const s of COB.sedes) {
+      cont.append(h('div', { class: 'tarjeta', style: 'margin:0' },
+        h('strong', {}, `${s.ciudad}${s.id_sede === COB.sede_que_responde ? ' (esta sede)' : ''}`),
+        h('div', { style: 'margin:8px 0 2px' }, `Pacientes migrados: ${s.pacientes_migrados} de ${s.pacientes} · ${s.porcentaje_pacientes} %`),
+        h('div', { class: 'barra-prog' }, h('span', { style: `width:${s.porcentaje_pacientes}%` })),
+        h('div', { style: 'margin:8px 0 2px' }, `Encuentros con RDA: ${s.encuentros_migrados} de ${s.encuentros} · ${s.porcentaje_encuentros} %`),
+        h('div', { class: 'barra-prog' }, h('span', { style: `width:${s.porcentaje_encuentros}%` }))));
+    }
+    vaciar($('#tabla-cobertura')).append(tabla([
+      { t: 'Sede', f: (s) => s.ciudad }, { t: 'Pacientes', f: (s) => s.pacientes }, { t: 'Migrados', f: (s) => s.pacientes_migrados },
+      { t: '% pacientes', f: (s) => s.porcentaje_pacientes }, { t: 'Encuentros', f: (s) => s.encuentros },
+      { t: 'Con RDA', f: (s) => s.encuentros_migrados }, { t: '% encuentros', f: (s) => s.porcentaje_encuentros },
+    ], COB.sedes));
+  } catch (e) { mostrar($('#cobertura'), 'mal', e.message); }
+}
+$('#csv-cobertura').addEventListener('click', () => {
+  if (!COB) return;
+  descargar('cobertura_migracion.csv', aCsv([['sede', 'pacientes', 'pacientes_migrados', 'porcentaje_pacientes', 'encuentros', 'encuentros_migrados', 'porcentaje_encuentros'],
+    ...COB.sedes.map((s) => [s.ciudad, s.pacientes, s.pacientes_migrados, s.porcentaje_pacientes, s.encuentros, s.encuentros_migrados, s.porcentaje_encuentros])]), 'text/csv');
+});
+
+/* ---------- CU-15 ---------- */
+async function cargarAuditoria() {
+  try {
+    AUD = (await api('/auditoria/57-campos', { params: { lote: LOTE } })).sedes;
+    SEDE_AUD = SEDE_AUD ?? AUD[0].id_sede;
+    pintarAuditoria();
+  } catch (e) { mostrar($('#resumen-auditoria'), 'mal', e.message); }
+}
+function pintarAuditoria() {
+  const past = vaciar($('#pestanas'));
+  for (const s of AUD) past.append(h('button', { type: 'button', class: s.id_sede === SEDE_AUD ? 'activa' : '', onclick: () => { SEDE_AUD = s.id_sede; pintarAuditoria(); } }, s.sede));
+  const s = AUD.find((x) => x.id_sede === SEDE_AUD);
+  vaciar($('#resumen-auditoria')).append(
+    insignia(`${s.resumen.completo} completos`, 'ok'), ' ', insignia(`${s.resumen.parcial} parciales`, 'aviso'), ' ', insignia(`${s.resumen.pendiente} pendientes`, 'mal'));
+  const celdas = vaciar($('#celdas'));
+  for (const c of s.campos) celdas.append(h('div', { class: c.estado, title: `Campo ${c.campo}: ${c.nombre} · ${c.porcentaje_cobertura} % (${c.tabla})` }, c.campo));
+  vaciar($('#detalle-auditoria')).append(tabla([
+    { t: '#', f: (c) => c.campo }, { t: 'Campo', f: (c) => c.nombre }, { t: 'Tabla', f: (c) => c.tabla },
+    { t: 'Cobertura', f: (c) => `${c.porcentaje_cobertura} %` },
+    { t: 'Estado', f: (c) => insignia(c.estado, c.estado === 'completo' ? 'ok' : c.estado === 'parcial' ? 'aviso' : 'mal') },
+  ], s.campos));
+}
+$('#csv-auditoria').addEventListener('click', () => {
+  if (!AUD) return;
+  const filas = [['lote', 'sede', 'campo', 'nombre', 'tabla', 'porcentaje_cobertura', 'estado']];
+  for (const s of AUD) for (const c of s.campos) filas.push([LOTE || 'todos', s.sede, c.campo, c.nombre, c.tabla, c.porcentaje_cobertura, c.estado]);
+  descargar('auditoria_57_campos.csv', aCsv(filas), 'text/csv');
+});
+
+/* Filtro por lote: solo cuentan los pacientes cuyo documento empieza por el prefijo (y sus encuentros). */
+(() => {
+  const f = $('#f-lote');
+  const entrada = h('input', { placeholder: 'Prefijo del documento, p. ej. DEMO57', maxlength: 20, style: 'max-width:280px' });
+  f.append(h('div', { style: 'flex:1; min-width:260px' }, h('label', { for: 'lote' }, 'Auditar solo un lote (opcional)'), Object.assign(entrada, { id: 'lote' })),
+    h('button', { type: 'submit', style: 'align-self:end' }, 'Aplicar'),
+    h('button', { type: 'button', class: 'sec', style: 'align-self:end', onclick: () => { entrada.value = ''; LOTE = ''; cargarAuditoria(); } }, 'Quitar filtro'));
+  f.addEventListener('submit', (ev) => { ev.preventDefault(); LOTE = entrada.value.trim(); cargarAuditoria(); });
+})();
+
+/* ---------- Réplica ---------- */
+async function cargarReplicacion() {
+  try {
+    const r = await api('/replicacion');
+    vaciar($('#replicacion')).append(tabla([
+      { t: 'Suscripción', f: (s) => s.subname },
+      { t: 'Habilitada', f: (s) => insignia(s.habilitada ? 'sí' : 'no', s.habilitada ? 'ok' : 'mal') },
+      { t: 'Conexión con el par', f: (s) => insignia(s.activa ? 'activa' : 'inactiva (par inaccesible)', s.activa ? 'ok' : 'mal') },
+      { t: 'Último mensaje', f: (s) => (s.segundos_sin_mensaje == null ? '—' : `hace ${s.segundos_sin_mensaje} s`) },
+    ], r.suscripciones));
+  } catch (e) { mostrar($('#replicacion'), 'mal', e.message); }
+}
+
+async function cargarAccesos() {
+  try {
+    const r = await api('/auditoria/accesos', { params: { limite: 50, solo_fallos: $('#solo-fallos').checked ? 'true' : '' } });
+    vaciar($('#accesos')).append(h('div', { style: 'overflow-x:auto' }, tabla([
+      { t: 'Fecha', f: (a) => fmtFecha(a.instante) }, { t: 'Usuario (rol)', f: (a) => (a.usuario || '—') + (a.rol ? ` (${a.rol})` : '') },
+      { t: 'Acción', f: (a) => `${a.metodo} ${a.ruta}` }, { t: 'Documento', f: (a) => a.documento || '—' },
+      { t: 'Resultado', f: (a) => insignia(String(a.estado), a.estado < 400 ? 'ok' : a.estado === 401 || a.estado === 403 ? 'mal' : 'aviso') },
+      { t: 'Desde', f: (a) => a.ip || '—' },
+      { t: 'Sello', f: (a) => h('code', { title: a.hash }, `${a.seq}:${a.hash.slice(0, 10)}…`) },
+    ], r.accesos, 'Todavía no hay accesos registrados.')));
+  } catch (e) { mostrar($('#accesos'), 'mal', e.message); }
+}
+$('#solo-fallos').addEventListener('change', cargarAccesos);
+
+const ESTADO_ANCLA = { ok: 'coincide', sin_anclas: 'aún sin anclas', no_responde: 'no responde', discrepancia: 'NO COINCIDE' };
+function lineaAnclaje(a) {
+  if (!a || !a.pares || !a.pares.length) return null;
+  return h('div', { class: 'sub', style: 'margin-top:6px' }, 'Anclaje de la cabeza en las otras sedes: ',
+    a.pares.map((p) => insignia(`${p.sede}: ${ESTADO_ANCLA[p.estado] || p.estado}` + (p.estado === 'ok' ? ` (n.º ${p.ultima.seq})` : ''),
+      p.estado === 'ok' ? 'ok' : p.estado === 'discrepancia' ? 'mal' : 'aviso')));
+}
+
+async function verificarAuditoria() {
+  const caja = $('#integridad');
+  try {
+    const v = await api('/auditoria/verificar');
+    vaciar(caja);
+    if (v.ok) {
+      caja.append(insignia('cadena íntegra', 'ok'), h('span', { class: 'sub', style: 'margin-left:8px' },
+        `${v.verificados} eventos verificados` + (v.cabeza ? ` · último sello ${v.cabeza.seq}:${v.cabeza.hash.slice(0, 16)}…` : '') + ` · ${fmtFecha(v.verificado_en)}`));
+    } else if (v.cadena_local_ok === false) {
+      caja.append(insignia('CADENA ROTA', 'mal'), h('span', { style: 'margin-left:8px' },
+        `Primer evento alterado: n.º ${v.primer_fallo.seq}. ${v.primer_fallo.motivo}. Los ${v.verificados} anteriores están íntegros.`));
+    } else {
+      caja.append(insignia('EL ANCLAJE NO COINCIDE', 'mal'), h('span', { style: 'margin-left:8px' },
+        `La cadena local cuadra consigo misma, pero no con lo que las otras sedes tienen anclado: ${v.primer_fallo.motivo}.`));
+    }
+    const l = lineaAnclaje(v.anclaje);
+    if (l) caja.append(l);
+  } catch (e) { mostrar(caja, 'mal', e.message); }
+}
+$('#verificar-auditoria').addEventListener('click', verificarAuditoria);
+
+/* El reporte de HC lo generan el auditor (reportero) y el médico de cualquier paciente, y el paciente solo el suyo. El resto de las tarjetas es del reportero. */
+const SOLO_REPORTERO = ['s-cobertura', 's-57', 's-replica', 's-accesos'];
+if (ROL === 'reportero' || ROL === 'administrador') {
+  cargarCobertura(); cargarAuditoria(); cargarReplicacion(); cargarAccesos(); verificarAuditoria();
+} else {
+  for (const id of SOLO_REPORTERO) $('#' + id).hidden = true;
+  if (ROL === 'medico') verificarAuditoria();
+  else { $('#s-estado').hidden = true; $('#s-integridad').hidden = true; }
+}
+if (ROL === 'reportero' || ROL === 'administrador') {
+  setInterval(cargarReplicacion, 5000);
+  setInterval(cargarAccesos, 15000);
+}
+
+/* ---------- Reporte de historia clínica por paciente ---------- */
+let REP = null;
+const COLOR_SEDE = { en_linea: 'ok', no_responde: 'mal', desconocido: 'aviso' };
+(() => {
+  const f = $('#f-reporte');
+  const tipo = h('select', { required: true });
+  const num = h('input', { required: true, placeholder: 'Número de documento', maxlength: 20 });
+  llenarSelect(tipo, 'tipo_documento', { vacio: 'Tipo…' }).then(() => { tipo.value = 'CC'; });
+  f.append(h('div', {}, h('label', { for: 'rep-tipo' }, 'Tipo de documento'), Object.assign(tipo, { id: 'rep-tipo' })),
+    h('div', { style: 'flex:1;min-width:220px' }, h('label', { for: 'rep-num' }, 'Número de documento'), Object.assign(num, { id: 'rep-num' })),
+    h('button', { type: 'submit', style: 'align-self:end' }, 'Generar reporte'));
+  async function generar() {
+    mostrar('#reporte-hc', 'info', 'Generando el reporte…');
+    try {
+      REP = await api('/reporte-hc/' + encodeURIComponent(num.value.trim()), { params: { cod_tipo_documento: tipo.value } });
+      pintarReporte(REP);
+    } catch (e) { REP = null; mostrar('#reporte-hc', e.estado === 404 ? 'aviso' : 'mal', e.message); }
+  }
+  f.addEventListener('submit', (ev) => { ev.preventDefault(); generar(); });
+  if (ROL === 'paciente') {          // el paciente solo genera el suyo: el documento viene de su sesión
+    api('/auth/yo').then((yo) => {
+      num.value = yo.numero_documento; num.readOnly = true;
+      llenarSelect(tipo, 'tipo_documento', { vacio: 'Tipo…' }).then(() => { tipo.value = yo.cod_tipo_documento; tipo.disabled = true; generar(); });
+    });
+  }
+})();
+
+function pintarReporte(r) {
+  const c = r.contenido;
+  const dest = vaciar($('#reporte-hc'));
+  const pac = c.sedes.map((s) => s.paciente).find(Boolean);
+  dest.append(
+    h('h4', { style: 'margin:0 0 4px' }, `${pac ? nombreCompleto(pac) : 'Paciente'} · ${c.tipo_documento} ${c.documento}`),
+    h('div', { class: 'sub', style: 'margin:0 0 8px' }, `Generado ${fmtFecha(r.generado_en)} · ${r.fuente}`),
+    r.aviso ? h('div', { class: 'mensaje aviso', role: 'alert' }, r.aviso) : h('div', { class: 'mensaje ok' }, 'Todas las sedes responden: el reporte incluye lo más reciente de cada una.'));
+  for (const s of c.sedes) {
+    const est = r.estado_sedes.find((x) => x.id_sede === s.id_sede) || { estado: 'desconocido' };
+    const cuerpo = [];
+    if (!s.paciente) {
+      cuerpo.push(h('div', { class: 'vacio' }, 'Esta sede no tiene registros del paciente.'));
+    } else {
+      const cob = s.cobertura;
+      cuerpo.push(
+        h('div', {}, `Nacimiento ${fmtDia(s.paciente.fecha_hora_nacimiento)} · sexo ${s.paciente.cod_sexo} · `, s.paciente.fhir_patient_id ? `Patient FHIR ${s.paciente.fhir_patient_id}` : 'sin Patient en FHIR'),
+        h('div', { style: 'margin:6px 0' }, insignia(`${cob.resumen.completo} de ${cob.total} campos completos`, cob.resumen.completo === cob.total ? 'ok' : 'aviso'),
+          ` ${cob.resumen.parcial} parciales · ${cob.resumen.pendiente} pendientes`),
+        cob.faltantes.length ? h('details', { class: 'plegable', open: true }, h('summary', {}, `Campos por completar (${cob.faltantes.length})`),
+          h('div', {}, h('ul', { style: 'margin:0;padding-left:18px' }, cob.faltantes.map((x) => h('li', {}, `${x.campo}. ${x.nombre} — ${x.estado} (${x.porcentaje} %)`))))) : null,
+        tabla([
+          { t: 'Inicio', f: (e) => fmtFecha(e.inicio) }, { t: 'Fin', f: (e) => fmtFecha(e.fin) },
+          { t: 'Diagnósticos', f: (e) => (e.diagnosticos.length ? e.diagnosticos.map((d) => `${d.cie10} ${d.descripcion}`).join('; ') : '—') },
+          { t: 'Tecnologías', f: (e) => e.n_tecnologias }, { t: 'Resultados', f: (e) => e.n_observaciones },
+          { t: 'FHIR', f: (e) => insignia(e.estado_migracion, e.estado_migracion === 'MIGRADO' ? 'ok' : e.estado_migracion === 'ERROR' ? 'mal' : 'aviso') },
+          { t: 'RDA', f: (e) => (e.fhir_bundle_id ? h('button', { type: 'button', class: 'sec no-imprimir', onclick: () => descargarRda(e) }, 'Descargar Bundle') : '—') },
+        ], s.encuentros, 'Sin encuentros registrados en esta sede.'));
+    }
+    dest.append(h('div', { class: 'tarjeta', style: 'margin:10px 0' },
+      h('strong', {}, `Sede ${s.sede} `), insignia(est.estado === 'en_linea' ? (est.detalle === 'esta sede' ? 'esta sede' : 'en línea') : est.estado === 'no_responde' ? 'no responde' : 'sin dato', COLOR_SEDE[est.estado] || 'aviso'),
+      h('div', { style: 'margin-top:8px' }, cuerpo)));
+  }
+  dest.append(
+    h('div', { class: 'tarjeta', style: 'margin:10px 0' }, h('strong', {}, 'Sello del reporte (SHA-256 del contenido clínico)'),
+      h('div', {}, h('code', { id: 'rep-sello', style: 'word-break:break-all' }, r.sello_sha256)),
+      h('div', { class: 'fila-botones no-imprimir', style: 'margin-top:8px' },
+        h('button', { type: 'button', class: 'sec', onclick: comprobarSello }, 'Comprobar sello en este navegador'),
+        h('button', { type: 'button', class: 'sec', onclick: () => window.print() }, 'Imprimir o guardar como PDF'),
+        h('button', { type: 'button', class: 'sec', onclick: () => descargar(`reporte_hc_${c.documento}.json`, JSON.stringify(r, null, 2), 'application/json') }, 'Descargar el reporte (JSON)')),
+      h('div', { id: 'rep-comprobacion', style: 'margin-top:6px', 'aria-live': 'polite' })));
+}
+
+async function comprobarSello() {
+  const caja = $('#rep-comprobacion');
+  try {
+    const hash = await sha256Hex(canonico(REP.contenido));
+    if (hash === REP.sello_sha256) vaciar(caja).append(insignia('El sello coincide con el contenido', 'ok'));
+    else vaciar(caja).append(insignia('El sello NO coincide: el contenido cambió', 'mal'));
+  } catch (e) { mostrar(caja, 'aviso', e.message); }
+}
+
+async function descargarRda(e) {
+  try {
+    const b = await api('/bundles/' + e.id_encuentro, { params: { completo: 'true' } });
+    descargar(`rda_${e.id_encuentro}.json`, JSON.stringify(b.bundle, null, 2), 'application/fhir+json');
+  } catch (er) { mostrar('#rep-comprobacion', 'mal', er.message); }
+}
+
+/* ---------- Estado de la plataforma ---------- */
+if (ROL !== 'paciente') {
+  cargarPlataforma($('#estado-plataforma'));
+  setInterval(() => cargarPlataforma($('#estado-plataforma')), 30000);
+}
+document.querySelectorAll('main > section.tarjeta:not(#s-reporte)').forEach((x) => x.classList.add('no-imprimir'));
+</script>
+</body>
+</html>

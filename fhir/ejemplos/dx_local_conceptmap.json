@@ -1,0 +1,105 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "dx-local-a-cie10",
+  "status": "active",
+  "name": "DiagnosticoLocalACie10",
+  "title": "Diagnóstico local del sistema legado a CIE-10",
+  "sourceUri": "https://hc.local/ValueSet/dx-local",
+  "targetUri": "http://hl7.org/fhir/sid/icd-10",
+  "group": [
+    {
+      "source": "https://hc.local/CodeSystem/dx-local",
+      "target": "http://hl7.org/fhir/sid/icd-10",
+      "element": [
+        {
+          "code": "DIARREA",
+          "display": "DIARREA",
+          "target": [
+            {
+              "code": "A09",
+              "display": "Diarrea y gastroenteritis",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "HIPERTENSION",
+          "display": "HIPERTENSION",
+          "target": [
+            {
+              "code": "I10",
+              "display": "Hipertensión esencial",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "DIABETES",
+          "display": "DIABETES",
+          "target": [
+            {
+              "code": "E11.9",
+              "display": "Diabetes mellitus tipo 2",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "ASMA",
+          "display": "ASMA",
+          "target": [
+            {
+              "code": "J45.9",
+              "display": "Asma",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "INFECCION URINARIA",
+          "display": "INFECCION URINARIA",
+          "target": [
+            {
+              "code": "N39.0",
+              "display": "Infección de vías urinarias",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "LUMBAGO",
+          "display": "LUMBAGO",
+          "target": [
+            {
+              "code": "M54.5",
+              "display": "Lumbago",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "NEUMONIA",
+          "display": "NEUMONIA",
+          "target": [
+            {
+              "code": "J18.9",
+              "display": "Neumonía",
+              "equivalence": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "CEFALEA",
+          "display": "CEFALEA",
+          "target": [
+            {
+              "code": "R51",
+              "display": "Cefalea",
+              "equivalence": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

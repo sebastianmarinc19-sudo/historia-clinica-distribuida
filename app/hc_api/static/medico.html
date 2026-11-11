@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vista del Médico · Historia clínica distribuida</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main>
+  <h2>Vista del Médico</h2>
+  <p class="sub">CU-04 Diagnósticos · CU-05 Tecnologías · CU-06 Entregas · CU-07 Resultados · CU-08 Antecedentes y riesgos ·
+    CU-09 Egreso · CU-10 Migrar a FHIR · CU-11 Identidad federada · CU-12 RDA · CU-13 Historia entre sedes</p>
+
+  <section class="tarjeta">
+    <h3>Buscar al paciente</h3>
+    <form id="f-buscar" class="rejilla" autocomplete="off"></form>
+    <div id="m-buscar"></div>
+  </section>
+
+  <section id="s-historia" hidden></section>
+  <section id="s-encuentro" hidden></section>
+
+  <section class="tarjeta" aria-labelledby="t-plataforma">
+    <h3 id="t-plataforma">Estado de la plataforma</h3>
+    <p class="sub" style="margin-top:0">Qué sedes responden desde esta, si el servidor FHIR está disponible y si el registro de auditoría está íntegro.
+      Si una sede no responde, la historia que ve aquí es su última copia replicada.</p>
+    <div id="plataforma" aria-live="polite"></div>
+  </section>
+</main>
+<script src="comun.js"></script>
+<script type="module">
+await cabecera('medico', ['medico']);
+let SEDE_LOCAL = null;
+const S = { doc: null, tipo: 'CC', historia: null, pacientes: [], encuentro: null, profesionales: [] };
+api('/sede').then((d) => { SEDE_LOCAL = d.sede_local; });
+
+/* ---------------------------------------------------------------- búsqueda */
+const fBuscar = $('#f-buscar');
+const selTipo = h('select', { required: true });
+const inpNum = h('input', { required: true, placeholder: 'Número de documento' });
+vaciar(fBuscar).append(campo('Tipo de documento', selTipo), campo('Número de documento', inpNum),
+  h('div', { style: 'align-self:end' }, h('button', { type: 'submit' }, 'Ver historia clínica')));
+llenarSelect(selTipo, 'tipo_documento', { vacio: 'Tipo…' }).then(() => { selTipo.value = 'CC'; });
+fBuscar.addEventListener('submit', (ev) => { ev.preventDefault(); cargarHistoria(selTipo.value, inpNum.value.trim()); });
+
+async function cargarHistoria(tipo, doc, { mantenerEncuentro } = {}) {
+  limpiar('#m-buscar');
+  try {
+    const [hist, busc] = await Promise.all([
+      api('/historia-federada/' + encodeURIComponent(doc), { params: { cod_tipo_documento: tipo } }),
+      api('/pacientes/buscar', { params: { cod_tipo_documento: tipo, numero_documento: doc } }),
+    ]);
+    if (!hist.encontrado) { $('#s-historia').hidden = true; $('#s-encuentro').hidden = true; mostrar('#m-buscar', 'info', 'No hay pacientes con ese documento en ninguna sede.'); return; }
+    Object.assign(S, { tipo, doc, historia: hist, pacientes: busc.pacientes });
+    pintarHistoria();
+    await cargarRevision();
+    if (!mantenerEncuentro) { S.encuentro = null; vaciar($('#s-encuentro')).hidden = true; }
+  } catch (e) { mostrar('#m-buscar', 'mal', e.message); }
+}
+
+/* ---------------------------------------------------------- historia federada */
+function pintarHistoria() {
+  const sec = vaciar($('#s-historia')); sec.hidden = false;
+  const h0 = S.historia, p0 = S.pacientes[0];
+  const local = S.pacientes.find((p) => p._id_sede === SEDE_LOCAL);
+  sec.append(h('div', { class: 'tarjeta' },
+    h('h3', {}, 'Paciente'),
+    h('dl', { class: 'kv' },
+      h('dt', {}, 'Nombre'), h('dd', {}, nombreCompleto(p0)),
+      h('dt', {}, 'Documento'), h('dd', {}, `${p0.cod_tipo_documento} ${p0.numero_documento}`),
+      h('dt', {}, 'Nacimiento'), h('dd', {}, fmtDia(p0.fecha_hora_nacimiento)),
+      h('dt', {}, 'Registros por sede'), h('dd', {}, S.pacientes.map((p) => insignia(`${p._sede_nombre}${p._id_sede === SEDE_LOCAL ? ' (esta sede)' : ''}`, p._id_sede === SEDE_LOCAL ? 'ok' : 'aviso')), ' '),
+      h('dt', {}, 'Identidad federada (MPI)'), h('dd', {}, h0.federado ? [insignia('resuelta', 'ok'), ' ', h('code', {}, h0.id_mpi.slice(0, 13) + '…')] : insignia('no hay otra sede con el mismo paciente', 'neutro'))),
+    h('div', { class: 'fila-botones' },
+      h('button', { class: 'sec', type: 'button', onclick: resolverMpi }, 'Resolver identidad federada (CU-11)'),
+      !local && insignia('Este paciente no está registrado en esta sede: solo lectura', 'aviso')),
+    h('div', { id: 'm-mpi' })));
+  sec.append(h('div', { id: 's-revision' }));
+  sec.append(h('div', { class: 'tarjeta' },
+    h('h3', {}, `Historia entre sedes (${h0.total_encuentros} encuentro${h0.total_encuentros === 1 ? '' : 's'})`),
+    tabla([
+      { t: 'Inicio', f: (e) => fmtFecha(e.fecha_hora_inicio) },
+      { t: 'Sede', f: (e) => insignia(e.sede_nombre + (e.es_replica ? ' · réplica' : ''), e.es_replica ? 'aviso' : 'ok') },
+      { t: 'Fin', f: (e) => (e.fecha_hora_fin ? fmtFecha(e.fecha_hora_fin) : insignia('abierto', 'info')) },
+      { t: 'FHIR', f: (e) => insignia(e.estado_migracion, e.estado_migracion === 'MIGRADO' ? 'ok' : e.estado_migracion === 'ERROR' ? 'mal' : 'neutro') },
+      { t: '', f: (e) => h('button', { class: 'sec', type: 'button', onclick: () => abrirEncuentro(e.id_encuentro) }, 'Abrir') },
+    ], h0.encuentros, 'Aún no hay encuentros registrados.'),
+    local && h('p', { class: 'sub', style: 'margin:10px 0 0' }, 'Para abrir un encuentro nuevo use la vista del Admisionista.')));
+}
+
+async function resolverMpi() {
+  const p = S.pacientes.find((x) => x._id_sede === SEDE_LOCAL) || S.pacientes[0];
+  try {
+    const r = await api('/mpi/resolver/' + p.id_paciente, { metodo: 'POST' });
+    await cargarHistoria(S.tipo, S.doc, { mantenerEncuentro: true });   // redibuja la tarjeta (y su #m-mpi): el mensaje va después
+    const pend = r.candidatos_pendientes ? ` Hay ${r.candidatos_pendientes} posible(s) duplicado(s) por revisar más abajo.` : '';
+    mostrar('#m-mpi', r.resuelto ? 'ok' : 'info', r.resuelto
+      ? `Identidad ${r.id_mpi.slice(0, 13)}… con ${r.miembros_totales} registros (vínculo más débil: ${r.score}). Cada sede la calcula sola y obtiene el mismo valor.${pend}`
+      : `No hay otro registro con el mismo documento ni una decisión que lo una a este.${pend}`);
+  } catch (e) { mostrar('#m-mpi', 'mal', e.message); }
+}
+
+/* ------------------------------------------------- posibles duplicados (MPI) */
+const MOTIVO_REVISION = {
+  datos_similares: 'Datos parecidos, documento distinto',
+  documento_con_datos_contradictorios: 'Mismo documento, datos contradictorios',
+};
+async function cargarRevision() {
+  const cont = $('#s-revision');
+  if (!cont) return;
+  try {
+    const r = await api('/mpi/revision', { params: { cod_tipo_documento: S.tipo, numero_documento: S.doc } });
+    vaciar(cont);
+    if (!r.pares.length) return;
+    const reg = (p) => h('div', {}, h('strong', {}, p.nombre),
+      h('div', { class: 'sub', style: 'margin:0' }, `${p.cod_tipo_documento} ${p.numero_documento} · nac. ${fmtDia(p.fecha_nacimiento)} · sexo ${p.cod_sexo} · ${p.sede_nombre}`));
+    const nota = h('input', { maxlength: 300, placeholder: 'Opcional' });
+    cont.append(h('div', { class: 'tarjeta' + (r.pendientes ? ' resaltada' : '') },
+      h('h3', {}, r.pendientes ? `Posibles duplicados por revisar (${r.pendientes})` : 'Decisiones sobre posibles duplicados'),
+      h('p', { class: 'sub', style: 'margin-top:0' }, 'Dos registros solo se unen solos si comparten documento. Estos casos necesitan que una persona confirme si son la misma; ' +
+        'la decisión se replica a las tres sedes y vale la más reciente.'),
+      campo('Motivo de la decisión', nota),
+      tabla([
+        { t: 'Registro A', f: (x) => reg(x.a) },
+        { t: 'Registro B', f: (x) => reg(x.b) },
+        { t: 'Por qué se propone', f: (x) => [insignia(MOTIVO_REVISION[x.motivo] || 'Decisión previa', 'aviso'), ` puntaje ${x.score}`] },
+        { t: 'Decisión vigente', f: (x) => (x.decision
+            ? [insignia(x.decision.decision === 'MISMA_PERSONA' ? 'misma persona' : 'personas distintas', x.decision.decision === 'MISMA_PERSONA' ? 'ok' : 'neutro'),
+               ` ${x.decision.decidido_por} (${x.decision.sede})`]
+            : insignia('pendiente', 'mal')) },
+        { t: '', f: (x) => h('div', { class: 'fila-botones', style: 'margin:0' },
+            h('button', { type: 'button', onclick: () => decidirPar(x, 'MISMA_PERSONA', nota.value) }, 'Es la misma persona'),
+            h('button', { type: 'button', class: 'sec', onclick: () => decidirPar(x, 'PERSONAS_DISTINTAS', nota.value) }, 'Son personas distintas')) },
+      ], r.pares)));
+  } catch (e) { mostrar(cont, 'mal', e.message); }
+}
+
+async function decidirPar(par, decision, motivo) {
+  try {
+    await api('/mpi/decisiones', { metodo: 'POST', cuerpo: { id_paciente_a: par.a.id_paciente, id_paciente_b: par.b.id_paciente, decision, motivo: motivo.trim() || null } });
+    await cargarHistoria(S.tipo, S.doc, { mantenerEncuentro: true });      // redibuja la revisión: el aviso va en #m-buscar, que no se redibuja
+    mostrar('#m-buscar', 'ok', decision === 'MISMA_PERSONA'
+      ? 'Decisión guardada: son la misma persona. Sus historias se muestran juntas y la decisión se replica a las demás sedes.'
+      : 'Decisión guardada: son personas distintas. No se unirán, aunque los datos se parezcan, y la decisión se replica a las demás sedes.');
+  } catch (e) { mostrar('#m-buscar', 'mal', e.message); }
+}
+
+/* ------------------------------------------------------------- un encuentro */
+async function abrirEncuentro(id) {
+  try {
+    S.encuentro = await api('/encuentros/' + id);
+    if (!S.profesionales.length) S.profesionales = (await api('/profesionales')).profesionales;
+    pintarEncuentro();
+    $('#s-encuentro').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) { mostrar('#m-buscar', 'mal', e.message); }
+}
+async function recargarEncuentro() {
+  S.encuentro = await api('/encuentros/' + S.encuentro.id_encuentro);
+  pintarEncuentro();
+  await cargarHistoria(S.tipo, S.doc, { mantenerEncuentro: true });
+}
+
+function lista(items, vacioTexto) {
+  return items.length ? h('ul', { style: 'margin:4px 0 8px; padding-left:20px' }, items.map((x) => h('li', {}, x))) : h('div', { class: 'vacio' }, vacioTexto);
+}
+
+/* Formulario plegable genérico a partir de una descripción de campos. */
+function formPlegable(titulo, campos, enviar) {
+  const f = h('form', { class: 'rejilla', autocomplete: 'off' });
+  const refs = {};
+  for (const c of campos) {
+    let ctrl;
+    if (c.cat) { ctrl = h('select', { required: !!c.req }); llenarSelect(ctrl, c.cat, { vacio: c.vacio || (c.req ? 'Seleccione…' : '— (opcional)'), etiqueta: c.etiqueta }); }
+    else if (c.opciones) { ctrl = h('select', { required: !!c.req }, h('option', { value: '' }, 'Seleccione…'), c.opciones.map((o) => h('option', { value: o.v }, o.t))); }
+    else if (c.tipo === 'check') ctrl = h('input', { type: 'checkbox' });
+    else ctrl = h('input', { type: c.tipo || 'text', required: !!c.req, step: c.step, maxlength: c.max, value: c.valor ?? (c.tipo === 'datetime-local' ? ahoraLocal() : c.tipo === 'date' ? ahoraLocal().slice(0, 10) : undefined) });
+    refs[c.n] = ctrl;
+    f.append(campo(c.et + (c.req ? ' *' : ''), ctrl));
+  }
+  const msg = h('div');
+  f.append(h('div', { style: 'grid-column:1/-1' }, h('button', { type: 'submit' }, 'Guardar'), msg));
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+      const v = {};
+      for (const c of campos) {
+        const e = refs[c.n];
+        let x = c.tipo === 'check' ? e.checked : e.value.trim();
+        if (x === '') x = null;
+        if (c.num && x != null) x = Number(x);
+        if (c.tipo === 'datetime-local' && x) x = aIso(x);
+        v[c.n] = x;
+      }
+      const txt = await enviar(v);
+      await recargarEncuentro();
+      // Tras recargar se redibuja todo; el mensaje se muestra en el aviso general.
+      mostrar('#m-encuentro-ok', 'ok', txt || 'Guardado.');
+    } catch (e) { mostrar(msg, 'mal', e.message); }
+  });
+  return h('details', { class: 'plegable' }, h('summary', {}, titulo), h('div', {}, f));
+}
+
+function pintarEncuentro() {
+  const e = S.encuentro, sec = vaciar($('#s-encuentro')); sec.hidden = false;
+  const soloLectura = e.es_replica;
+  const base = `/encuentros/${e.id_encuentro}`;
+  const prof = S.profesionales.map((p) => ({ v: p.id_profesional, t: `${p.nombres} ${p.apellidos} · ${p.cod_tipo_documento} ${p.numero_documento}` }));
+  const tecnologiasEnc = e.tecnologias.map((t) => ({ v: t.id_tecnologia_encuentro, t: `${t.tecnologia_descripcion}` }));
+
+  sec.append(h('div', { class: 'tarjeta resaltada' },
+    h('h3', {}, `Encuentro del ${fmtFecha(e.fecha_hora_inicio)} · sede ${e.sede_nombre}`),
+    soloLectura && h('div', { class: 'mensaje aviso' }, `Registro de ${e.sede_nombre}: esta sede solo tiene una copia de lectura. Solo ${e.sede_nombre} puede modificarlo.`),
+    h('div', { id: 'm-encuentro-ok' }),
+    h('dl', { class: 'kv' },
+      h('dt', {}, 'Estado'), h('dd', {}, e.fecha_hora_fin ? ['Cerrado el ', fmtFecha(e.fecha_hora_fin)] : insignia('abierto', 'info')),
+      h('dt', {}, 'Migración a FHIR'), h('dd', {}, insignia(e.estado_migracion, e.estado_migracion === 'MIGRADO' ? 'ok' : e.estado_migracion === 'ERROR' ? 'mal' : 'neutro')),
+      h('dt', {}, 'Triage'), h('dd', {}, e.triage ? `Nivel ${e.triage.cod_triage} (${fmtFecha(e.triage.fecha_hora_triage)})` : '—'))));
+
+  /* Diagnósticos */
+  const rolTxt = { IN: 'Ingreso', EP: 'Egreso principal', RE: 'Relacionado', CO: 'Complicación', CM: 'Causa de muerte' };
+  sec.append(h('div', { class: 'tarjeta' }, h('h3', {}, 'Diagnósticos (CU-04)'),
+    lista(e.diagnosticos.map((d) => `${rolTxt[d.cod_tipo_diagnostico] || d.cod_tipo_diagnostico}: ${d.cod_cie10} · ${d.cie10_descripcion}`), 'Sin diagnósticos.'),
+    !soloLectura && formPlegable('Agregar diagnóstico', [
+      { n: 'cod_cie10', et: 'Diagnóstico CIE-10', cat: 'cie10', req: true },
+      { n: 'cod_tipo_diagnostico', et: 'Rol del diagnóstico', cat: 'tipo_diagnostico', req: true },
+      { n: 'fecha_diagnostico', et: 'Fecha', tipo: 'date', req: true },
+    ], async (v) => { await api(base + '/diagnosticos', { metodo: 'POST', cuerpo: v }); return 'Diagnóstico registrado.'; })));
+
+  /* Tecnologías, medicamentos y entregas */
+  sec.append(h('div', { class: 'tarjeta' }, h('h3', {}, 'Tecnologías en salud, medicamentos y entregas (CU-05, CU-06)'),
+    e.tecnologias.length ? tabla([
+      { t: 'Tecnología', f: (t) => [t.tecnologia_descripcion, ' ', insignia(t.tecnologia_tipo.toLowerCase(), 'neutro')] },
+      { t: 'Prescripción', f: (t) => t.medicamento
+          ? `${t.medicamento.dosis_prescrita} ${t.medicamento.cod_unidad_dosis} · vía ${t.medicamento.cod_via_administracion} · cada ${t.medicamento.frecuencia_valor} ${t.medicamento.cod_unidad_frecuencia} por ${t.medicamento.duracion_tratamiento} ${t.medicamento.cod_unidad_duracion}`
+          : '—' },
+      { t: 'Entregas', f: (t) => t.entregas.length ? t.entregas.map((x) => `${fmtFecha(x.fecha_entrega)}: ${x.dosis_administrada ?? x.dosis_entregada ?? ''} ${x.cod_unidad_dosis || ''} ×${x.unidades_entregadas}`).join(' | ') : '—' },
+    ], e.tecnologias) : h('div', { class: 'vacio' }, 'Sin tecnologías.'),
+    !soloLectura && formTecnologia(base),
+    !soloLectura && e.tecnologias.length > 0 && formPlegable('Registrar entrega o aplicación (CU-06)', [
+      { n: 'id_tecnologia_encuentro', et: 'Tecnología', opciones: tecnologiasEnc, req: true },
+      { n: 'id_profesional', et: 'Profesional que entrega o aplica', opciones: prof, req: true },
+      { n: 'fecha_entrega', et: 'Fecha y hora', tipo: 'datetime-local', req: true },
+      { n: 'dosis_administrada', et: 'Dosis administrada', tipo: 'number', step: 'any', num: true },
+      { n: 'dosis_entregada', et: 'Dosis entregada', tipo: 'number', step: 'any', num: true },
+      { n: 'cod_unidad_dosis', et: 'Unidad de la dosis', cat: 'unidad_medida' },
+      { n: 'unidades_entregadas', et: 'Unidades entregadas', tipo: 'number', valor: 1, num: true, req: true },
+    ], async (v) => { await api(base + '/entregas', { metodo: 'POST', cuerpo: v }); return 'Entrega registrada.'; })));
+
+  /* Resultados */
+  sec.append(h('div', { class: 'tarjeta' }, h('h3', {}, 'Resultados de valoración clínica (CU-07)'),
+    lista(e.observaciones.map((o) => `${o.loinc_descripcion} (${o.cod_loinc}): ${o.valor_numerico ?? o.valor_texto} ${o.cod_unidad || ''} · ${fmtFecha(o.fecha_hora_medicion)}`), 'Sin resultados.'),
+    !soloLectura && formPlegable('Agregar resultado', [
+      { n: 'cod_loinc', et: 'Prueba (LOINC)', cat: 'loinc', req: true },
+      { n: 'valor_numerico', et: 'Valor numérico', tipo: 'number', step: 'any', num: true },
+      { n: 'cod_unidad', et: 'Unidad (obligatoria con valor numérico)', cat: 'unidad_medida' },
+      { n: 'valor_texto', et: 'Valor en texto', max: 250 },
+      { n: 'fecha_hora_medicion', et: 'Fecha y hora', tipo: 'datetime-local', req: true },
+    ], async (v) => { await api(base + '/observaciones', { metodo: 'POST', cuerpo: v }); return 'Resultado registrado.'; })));
+
+  /* Antecedentes y riesgos */
+  sec.append(h('div', { class: 'tarjeta' }, h('h3', {}, 'Antecedentes y exposición a riesgos (CU-08)'),
+    h('div', { class: 'rejilla dos' },
+      h('div', {}, h('strong', {}, 'Antecedentes de salud'),
+        lista(e.antecedentes.map((a) => [a.cod_cie10, a.descripcion].filter(Boolean).join(' · ')), 'Sin antecedentes.'),
+        !soloLectura && formPlegable('Agregar antecedente', [
+          { n: 'cod_cie10', et: 'Diagnóstico CIE-10', cat: 'cie10' },
+          { n: 'descripcion', et: 'Descripción', max: 300 },
+        ], async (v) => { await api(base + '/antecedentes', { metodo: 'POST', cuerpo: v }); return 'Antecedente registrado.'; })),
+      h('div', {}, h('strong', {}, 'Factores de riesgo'),
+        lista(e.exposiciones.map((x) => x.cod_factor_riesgo), 'Sin exposiciones registradas.'),
+        !soloLectura && formPlegable('Agregar factor de riesgo', [
+          { n: 'cod_factor_riesgo', et: 'Factor de riesgo', cat: 'factor_riesgo', req: true },
+        ], async (v) => { await api(base + '/exposiciones', { metodo: 'POST', cuerpo: v }); return 'Exposición registrada.'; })))));
+
+  /* Egreso */
+  sec.append(h('div', { class: 'tarjeta' }, h('h3', {}, 'Egreso (CU-09)'),
+    e.egreso
+      ? h('dl', { class: 'kv' }, h('dt', {}, 'Condición y destino'), h('dd', {}, e.egreso.cod_condicion_egreso),
+          h('dt', {}, 'Incapacidad (días)'), h('dd', {}, e.egreso.dias_incapacidad ?? '—'),
+          h('dt', {}, 'Licencia de maternidad (días)'), h('dd', {}, e.egreso.dias_licencia_maternidad ?? '—'))
+      : h('div', { class: 'vacio' }, 'Encuentro aún abierto.'),
+    !soloLectura && !e.egreso && formPlegable('Registrar egreso y cerrar el encuentro', [
+      { n: 'fecha_hora_fin', et: 'Fecha y hora de finalización', tipo: 'datetime-local', req: true },
+      { n: 'cod_condicion_egreso', et: 'Condición y destino', cat: 'condicion_egreso', req: true },
+      { n: 'id_profesional_egreso', et: 'Profesional que da el egreso', opciones: prof, req: true },
+      { n: 'cod_prestador_referencia', et: 'Prestador al que se remite', cat: 'prestador', etiqueta: (i) => `${i.codigo} · ${i.descripcion}` },
+      { n: 'dias_incapacidad', et: 'Días de incapacidad', tipo: 'number', num: true },
+      { n: 'dias_licencia_maternidad', et: 'Días de licencia de maternidad', tipo: 'number', num: true },
+    ], async (v) => { await api(base + '/egreso', { metodo: 'POST', cuerpo: v }); return 'Egreso registrado; el encuentro quedó cerrado.'; }),
+    !soloLectura && formPlegable('Registrar un profesional de salud nuevo', [
+      { n: 'cod_tipo_documento', et: 'Tipo de documento', cat: 'tipo_documento', req: true },
+      { n: 'numero_documento', et: 'Número', req: true, max: 20 },
+      { n: 'nombres', et: 'Nombres', req: true }, { n: 'apellidos', et: 'Apellidos', req: true },
+    ], async (v) => { await api('/profesionales', { metodo: 'POST', cuerpo: v }); S.profesionales = (await api('/profesionales')).profesionales; return 'Profesional registrado; ya aparece en las listas.'; })));
+
+  /* FHIR */
+  sec.append(h('div', { class: 'tarjeta' }, h('h3', {}, 'Interoperabilidad: migración a FHIR y RDA (CU-10, CU-12)'),
+    h('p', { class: 'sub', style: 'margin-top:0' }, 'Genera el Reporte de Detalle de Atención (Bundle FHIR tipo document) y lo guarda en el servidor FHIR de la sede dueña.'),
+    h('div', { class: 'fila-botones', style: 'margin-top:0' },
+      !soloLectura && h('button', { type: 'button', onclick: migrar }, e.estado_migracion === 'MIGRADO' ? 'Volver a generar el RDA' : 'Migrar a FHIR y generar RDA'),
+      e.bundle && h('button', { type: 'button', class: 'sec', onclick: verRda }, 'Ver el RDA')),
+    h('div', { id: 'm-fhir' }), h('div', { id: 'v-rda' })));
+}
+
+function formTecnologia(base) {
+  const f = h('form', { class: 'rejilla', autocomplete: 'off' });
+  const R = {};
+  const tec = h('select', { required: true }), fin = h('select', { required: true });
+  const camposMed = h('div', { class: 'rejilla', style: 'grid-column:1/-1', hidden: true });
+  const medCtl = (n, et, nodo) => { R[n] = nodo; camposMed.append(campo(et, nodo)); };
+  medCtl('cod_medicamento', 'Medicamento *', h('select'));
+  medCtl('dosis_prescrita', 'Dosis prescrita *', h('input', { type: 'number', step: 'any' }));
+  medCtl('cod_unidad_dosis', 'Unidad de la dosis *', h('select'));
+  medCtl('cod_via_administracion', 'Vía de administración *', h('select'));
+  medCtl('duracion_tratamiento', 'Duración *', h('input', { type: 'number' }));
+  medCtl('cod_unidad_duracion', 'Unidad de la duración *', h('select'));
+  medCtl('frecuencia_valor', 'Frecuencia (cada…) *', h('input', { type: 'number' }));
+  medCtl('cod_unidad_frecuencia', 'Unidad de la frecuencia *', h('select'));
+  llenarSelect(R.cod_medicamento, 'medicamento'); llenarSelect(R.cod_unidad_dosis, 'unidad_medida'); llenarSelect(R.cod_via_administracion, 'via_administracion');
+  llenarSelect(R.cod_unidad_duracion, 'unidad_medida'); llenarSelect(R.cod_unidad_frecuencia, 'unidad_medida');
+  const fecha = h('input', { type: 'datetime-local', required: true, value: ahoraLocal() });
+  let tipoSel = null;
+  llenarSelect(tec, 'tecnologia_salud', { vacio: 'Seleccione…', etiqueta: (i) => `${i.codigo} · ${i.descripcion} (${i.tipo.toLowerCase()})` }).then((items) => {
+    tec.addEventListener('change', () => {
+      tipoSel = (items.find((i) => i.codigo === tec.value) || {}).tipo;
+      camposMed.hidden = tipoSel !== 'MEDICAMENTO';
+      if (tipoSel === 'MEDICAMENTO' && !R.cod_medicamento.value) R.cod_medicamento.value = tec.value;
+    });
+  });
+  llenarSelect(fin, 'finalidad_tecnologia');
+  const msg = h('div');
+  f.append(campo('Tecnología *', tec), campo('Finalidad *', fin), campo('Fecha y hora de prescripción *', fecha), camposMed,
+    h('div', { style: 'grid-column:1/-1' }, h('button', { type: 'submit' }, 'Guardar'), msg));
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    try {
+      const cuerpo = { cod_tecnologia: tec.value, cod_finalidad: fin.value, fecha_prescripcion: aIso(fecha.value), medicamento: null };
+      if (tipoSel === 'MEDICAMENTO') cuerpo.medicamento = {
+        cod_medicamento: R.cod_medicamento.value, dosis_prescrita: Number(R.dosis_prescrita.value), cod_unidad_dosis: R.cod_unidad_dosis.value,
+        cod_via_administracion: R.cod_via_administracion.value, duracion_tratamiento: Number(R.duracion_tratamiento.value),
+        cod_unidad_duracion: R.cod_unidad_duracion.value, frecuencia_valor: Number(R.frecuencia_valor.value), cod_unidad_frecuencia: R.cod_unidad_frecuencia.value };
+      await api(base + '/tecnologias', { metodo: 'POST', cuerpo });
+      await recargarEncuentro();
+      mostrar('#m-encuentro-ok', 'ok', 'Tecnología registrada.');
+    } catch (e) { mostrar(msg, 'mal', e.message); }
+  });
+  return h('details', { class: 'plegable' }, h('summary', {}, 'Prescribir o registrar una tecnología'), h('div', {}, f));
+}
+
+async function migrar() {
+  mostrar('#m-fhir', 'info', 'Generando el RDA y enviándolo al servidor FHIR de la sede…');
+  try {
+    const r = await api(`/migracion/encuentro/${S.encuentro.id_encuentro}`, { metodo: 'POST' });
+    const rc = r.recursos_incluidos;
+    await recargarEncuentro();
+    mostrar('#m-fhir', 'ok', `Migrado. Bundle FHIR ${r.fhir_bundle_id} con ${rc.diagnosticos} diagnóstico(s), ${rc.medicamentos} medicamento(s), ${rc.procedimientos} procedimiento(s) y ${rc.observaciones} observación(es). ` +
+      (r.identidad_federada.resuelto ? `Identidad federada ${r.identidad_federada.id_mpi.slice(0, 13)}…` : 'Sin coincidencia en otras sedes.'));
+  } catch (e) {
+    mostrar('#m-fhir', e.estado === 503 ? 'aviso' : 'mal', e.message);
+    if (e.estado) await recargarEncuentro().catch(() => {});
+  }
+}
+
+async function verRda() {
+  try {
+    const b = await api('/bundles/' + S.encuentro.id_encuentro, { params: { completo: 'true', verificar_hapi: 'true' } });
+    const tipos = {};
+    for (const x of b.bundle.entry) tipos[x.resource.resourceType] = (tipos[x.resource.resourceType] || 0) + 1;
+    const cont = vaciar($('#v-rda'));
+    cont.append(h('div', { class: 'mensaje info' },
+      `Bundle ${b.fhir_bundle_id} (${b.bundle.type}) · ${b.total_entradas} recursos: ` + Object.entries(tipos).map(([k, v]) => `${k} ×${v}`).join(', ') +
+      (b.es_replica ? ' · copia replicada desde la sede dueña' : '') +
+      (b.hapi ? ` · HAPI: ${b.hapi.estado === 'ok' ? 'confirmado' : b.hapi.estado}` : '')),
+      h('div', { class: 'fila-botones' }, h('button', { type: 'button', class: 'sec', onclick: () => descargar(`rda-${b.fhir_bundle_id}.json`, JSON.stringify(b.bundle, null, 2), 'application/fhir+json') }, 'Descargar JSON')),
+      h('pre', {}, JSON.stringify(b.bundle, null, 2).slice(0, 6000) + '\n…'));
+  } catch (e) { mostrar('#v-rda', 'mal', e.message); }
+}
+
+/* ---------- Estado de la plataforma ---------- */
+cargarPlataforma($('#plataforma'));
+setInterval(() => cargarPlataforma($('#plataforma')), 30000);
+</script>
+</body>
+</html>

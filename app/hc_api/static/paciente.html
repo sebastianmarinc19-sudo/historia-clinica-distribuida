@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vista del Paciente · Historia clínica distribuida</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main>
+  <h2>Vista del Paciente</h2>
+  <p class="sub">CU-13 Consultar mi historia entre sedes · CU-12 Descargar mi RDA (solo lectura)</p>
+
+  <div class="mensaje aviso" role="note">
+    <strong>Prototipo de laboratorio.</strong> Se ingresa con documento y fecha de nacimiento, que la sede verifica contra su copia; el acceso
+    queda limitado a su propia historia y se registra. Un despliegue real debe usar OpenID Connect y registrar el consentimiento
+    (Ley 1581 de 2012); aquí no están implementados.
+  </div>
+
+  <section class="tarjeta" id="s-ingreso">
+    <h3>Ingresar</h3>
+    <form id="f-ingreso" class="rejilla" autocomplete="off"></form>
+    <div id="m-ingreso"></div>
+  </section>
+
+  <section id="s-datos" hidden></section>
+  <section id="s-historia" hidden></section>
+  <section class="tarjeta" id="s-accesos" hidden aria-labelledby="t-accesos">
+    <h3 id="t-accesos">Quién ha accedido a mi historia</h3>
+    <p class="sub" style="margin-top:0">Cada consulta o cambio que el personal hizo sobre sus datos en esta sede, con quién y cuándo. Cada sede guarda el suyo.</p>
+    <div id="mis-accesos" aria-live="polite"></div>
+  </section>
+  <section class="tarjeta" id="s-reporte-enlace" hidden aria-labelledby="t-reporte-enlace">
+    <h3 id="t-reporte-enlace">Reporte de mi historia clínica</h3>
+    <p class="sub" style="margin-top:0">Su historia por sede con la cobertura de los datos, un sello de integridad que puede comprobar, impresión o PDF, y la descarga de sus Bundles FHIR.</p>
+    <a href="reportes.html">Abrir el reporte de mi historia</a>
+  </section>
+</main>
+<script src="comun.js"></script>
+<script type="module">
+const ses = await cabecera('paciente');
+let SEDE_LOCAL = null;
+api('/sede').then((d) => { SEDE_LOCAL = d.sede_local; });
+
+const selTipo = h('select', { required: true });
+const inpNum = h('input', { required: true, placeholder: 'Número de documento' });
+const inpNac = h('input', { type: 'date', required: true });
+vaciar($('#f-ingreso')).append(campo('Tipo de documento', selTipo), campo('Número de documento', inpNum), campo('Fecha de nacimiento', inpNac),
+  h('div', { style: 'align-self:end' }, h('button', { type: 'submit' }, 'Ver mi historia clínica')));
+llenarSelect(selTipo, 'tipo_documento', { vacio: 'Tipo…' }).then(() => { selTipo.value = 'CC'; });
+
+async function cargarMiHistoria(tipo, doc) {
+  const busc = await api('/pacientes/buscar', { params: { cod_tipo_documento: tipo, numero_documento: doc } });
+  const hist = await api('/historia-federada/' + encodeURIComponent(doc), { params: { cod_tipo_documento: tipo } });
+  $('#s-ingreso').hidden = true;
+  pintarDatos(busc.pacientes[0], busc.pacientes, hist);
+  pintarHistoria(hist);
+}
+
+$('#f-ingreso').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  limpiar('#m-ingreso');
+  try {
+    // El token que entrega la sede solo sirve para este documento; las demás consultas lo exigen.
+    const resp = await api('/auth/paciente', { metodo: 'POST', sinSesion: true,
+      cuerpo: { cod_tipo_documento: selTipo.value, numero_documento: inpNum.value.trim(), fecha_nacimiento: inpNac.value } });
+    sesion.guardar(resp);
+    location.reload();
+  } catch (e) { $('#s-datos').hidden = true; $('#s-historia').hidden = true; mostrar('#m-ingreso', 'mal', e.message); }
+});
+
+// Si ya hay una sesión de paciente (recarga de la página), se retoma sin pedir los datos otra vez.
+async function cargarMisAccesos() {
+  try {
+    const r = await api('/auditoria/mis-accesos', { params: { limite: 50 } });
+    $('#s-accesos').hidden = false; $('#s-reporte-enlace').hidden = false;
+    vaciar($('#mis-accesos')).append(h('div', { style: 'overflow-x:auto' }, tabla([
+      { t: 'Fecha', f: (a) => fmtFecha(a.instante) }, { t: 'Quién', f: (a) => `${a.usuario || '—'}${a.rol ? ` (${a.rol})` : ''}` },
+      { t: 'Qué hizo', f: (a) => (a.metodo === 'GET' ? 'Consultó' : 'Modificó') },
+      { t: 'Resultado', f: (a) => insignia(a.estado < 400 ? 'permitido' : a.estado === 401 || a.estado === 403 ? 'rechazado' : 'error', a.estado < 400 ? 'ok' : 'aviso') },
+    ], r.accesos, 'Todavía no hay accesos registrados a su historia en esta sede.')));
+  } catch (e) { $('#s-accesos').hidden = false; mostrar('#mis-accesos', 'mal', e.message); }
+}
+
+if (ses && ses.usuario.rol === 'paciente') {
+  try {
+    const yo = await api('/auth/yo');
+    await cargarMiHistoria(yo.cod_tipo_documento, yo.numero_documento);
+    await cargarMisAccesos();
+  } catch (e) { mostrar('#m-ingreso', 'mal', e.message); }
+} else if (ses) {
+  mostrar('#m-ingreso', 'aviso', 'Hay una sesión del personal abierta en esta pestaña; al ingresar como paciente se reemplaza.');
+}
+
+function pintarDatos(p, registros, hist) {
+  const sec = vaciar($('#s-datos')); sec.hidden = false;
+  sec.append(h('div', { class: 'tarjeta' }, h('h3', {}, 'Mis datos'),
+    h('dl', { class: 'kv' },
+      h('dt', {}, 'Nombre'), h('dd', {}, nombreCompleto(p)),
+      h('dt', {}, 'Documento'), h('dd', {}, `${p.cod_tipo_documento} ${p.numero_documento}`),
+      h('dt', {}, 'Fecha de nacimiento'), h('dd', {}, fmtDia(p.fecha_hora_nacimiento)),
+      h('dt', {}, 'Sedes donde tengo registro'), h('dd', {}, registros.map((r) => insignia(r._sede_nombre, 'info')), ' '),
+      h('dt', {}, 'Origen de esta pantalla'), h('dd', {}, 'La copia de la sede que lo atiende ahora; sigue disponible aunque otra sede esté fuera de servicio.'))));
+}
+
+async function pintarHistoria(hist) {
+  const sec = vaciar($('#s-historia')); sec.hidden = false;
+  sec.append(h('h3', { style: 'margin:6px 0 10px' }, `Mis atenciones (${hist.total_encuentros})`));
+  if (!hist.total_encuentros) { sec.append(h('div', { class: 'tarjeta vacio' }, 'Todavía no tiene atenciones registradas.')); return; }
+  const linea = h('div', { class: 'linea-tiempo' });
+  for (const e of [...hist.encuentros].reverse()) {
+    const cuerpo = h('div', { id: 'e-' + e.id_encuentro });
+    const det = h('details', { class: 'plegable' }, h('summary', {}, 'Ver el detalle de esta atención'), cuerpo);
+    det.addEventListener('toggle', () => { if (det.open && !cuerpo.dataset.listo) { cuerpo.dataset.listo = '1'; cargarDetalle(e, cuerpo); } });
+    linea.append(h('div', { class: 'hito' + (e.es_replica ? ' replica' : '') },
+      h('strong', {}, fmtFecha(e.fecha_hora_inicio)), ' ',
+      insignia(`Atendido en ${e.sede_nombre}`, 'info'), ' ',
+      e.es_replica && insignia('copia disponible en esta sede', 'aviso'), ' ',
+      e.fecha_hora_fin ? insignia('finalizada', 'ok') : insignia('en curso', 'aviso'),
+      h('div', { style: 'margin-top:6px' }, det)));
+  }
+  sec.append(h('div', { class: 'tarjeta' }, linea));
+}
+
+async function cargarDetalle(resumen, cont) {
+  try {
+    const e = await api('/encuentros/' + resumen.id_encuentro);
+    const rol = { IN: 'Ingreso', EP: 'Diagnóstico principal', RE: 'Relacionado', CO: 'Complicación', CM: 'Causa de muerte' };
+    const meds = e.tecnologias.filter((t) => t.medicamento);
+    const otros = e.tecnologias.filter((t) => !t.medicamento);
+    const egreso = e.egreso ? await descripcion('condicion_egreso', e.egreso.cod_condicion_egreso) : null;
+    const ul = (items, v) => (items.length ? h('ul', { style: 'margin:4px 0 10px; padding-left:20px' }, items.map((x) => h('li', {}, x))) : h('div', { class: 'vacio' }, v));
+    cont.append(
+      h('strong', {}, 'Diagnósticos'), ul(e.diagnosticos.map((d) => `${rol[d.cod_tipo_diagnostico] || ''}: ${d.cie10_descripcion}`), 'Sin diagnósticos registrados.'),
+      h('strong', {}, 'Medicamentos'), ul(meds.map((t) => `${t.tecnologia_descripcion}: ${t.medicamento.dosis_prescrita} ${t.medicamento.cod_unidad_dosis} cada ${t.medicamento.frecuencia_valor} ${t.medicamento.cod_unidad_frecuencia} durante ${t.medicamento.duracion_tratamiento} ${t.medicamento.cod_unidad_duracion}`), 'Sin medicamentos.'),
+      ...(otros.length ? [h('strong', {}, 'Procedimientos'), ul(otros.map((t) => t.tecnologia_descripcion), '')] : []),
+      h('strong', {}, 'Resultados'), ul(e.observaciones.map((o) => `${o.loinc_descripcion}: ${o.valor_numerico ?? o.valor_texto} ${o.cod_unidad || ''}`), 'Sin resultados.'),
+      h('strong', {}, 'Al salir'), h('div', { style: 'margin:4px 0 10px' }, egreso ? egreso : 'La atención sigue abierta.'));
+    if (e.bundle) cont.append(h('div', { class: 'fila-botones' }, h('button', { type: 'button', class: 'sec', onclick: () => descargarRda(e) }, 'Descargar mi RDA (JSON FHIR)')));
+  } catch (err) { cont.append(h('div', { class: 'mensaje mal' }, err.message)); }
+}
+
+async function descargarRda(e) {
+  try {
+    const b = await api('/bundles/' + e.id_encuentro, { params: { completo: 'true' } });
+    descargar(`mi-rda-${b.fhir_bundle_id}.json`, JSON.stringify(b.bundle, null, 2), 'application/fhir+json');
+  } catch (err) { alert(err.message); }
+}
+</script>
+</body>
+</html>

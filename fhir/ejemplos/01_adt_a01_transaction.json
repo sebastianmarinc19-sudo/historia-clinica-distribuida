@@ -1,0 +1,123 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "Patient/pac-1007",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "pac-1007",
+        "identifier": [
+          {
+            "system": "https://hc.local/sid/documento",
+            "value": "1007"
+          }
+        ],
+        "name": [
+          {
+            "family": "Rojas",
+            "given": [
+              "Andrea"
+            ]
+          }
+        ],
+        "gender": "female",
+        "birthDate": "1990-02-14"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Patient/pac-1007"
+      }
+    },
+    {
+      "fullUrl": "Practitioner/med-MED-02",
+      "resource": {
+        "resourceType": "Practitioner",
+        "id": "med-MED-02",
+        "identifier": [
+          {
+            "value": "MED-02"
+          }
+        ],
+        "name": [
+          {
+            "family": "Ruiz",
+            "given": [
+              "Mateo"
+            ]
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Practitioner/med-MED-02"
+      }
+    },
+    {
+      "fullUrl": "Encounter/enc-2-V-S2-0101",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "enc-2-V-S2-0101",
+        "status": "in-progress",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "ambulatory"
+        },
+        "subject": {
+          "reference": "Patient/pac-1007"
+        },
+        "period": {
+          "start": "2026-11-07T10:15:00-05:00"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "Practitioner/med-MED-02"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Encounter/enc-2-V-S2-0101"
+      }
+    },
+    {
+      "fullUrl": "Condition/cond-2-V-S2-0101-J45.9",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-2-V-S2-0101-J45.9",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/icd-10",
+              "code": "J45.9",
+              "display": "Asma"
+            }
+          ],
+          "text": "Asma"
+        },
+        "subject": {
+          "reference": "Patient/pac-1007"
+        },
+        "encounter": {
+          "reference": "Encounter/enc-2-V-S2-0101"
+        },
+        "recordedDate": "2026-11-07"
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Condition/cond-2-V-S2-0101-J45.9"
+      }
+    }
+  ]
+}

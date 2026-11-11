@@ -1,0 +1,614 @@
+{
+ "resourceType": "Bundle",
+ "type": "searchset",
+ "total": 8,
+ "link": [
+  {
+   "relation": "self",
+   "url": "/api/v2/auditoria/fhir?limite=8"
+  }
+ ],
+ "entry": [
+  {
+   "fullUrl": "AuditEvent/audit-1-345",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-345",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "create",
+      "display": "create"
+     }
+    ],
+    "action": "C",
+    "recorded": "2026-11-09T20:00:32.503811+00:00",
+    "outcome": "0",
+    "outcomeDesc": "HTTP 200",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "auditor"
+      },
+      "network": {
+       "address": "172.18.0.1",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "display": "evento 345 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "345"
+       },
+       {
+        "type": "hash",
+        "valueString": "0a1a582231fe843e53b4b51a0829db47987533e2793fbefeb7da00955aa3a045"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "eae0443abaf6f7f1706ed9ccf3bd72b3ec982a553c56cad2f34ca18d6d571a84"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "AuditEvent/audit-1-344",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-344",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "create",
+      "display": "create"
+     }
+    ],
+    "action": "C",
+    "recorded": "2026-11-09T19:59:27.693128+00:00",
+    "outcome": "0",
+    "outcomeDesc": "HTTP 200",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "auditor"
+      },
+      "network": {
+       "address": "172.18.0.1",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "display": "evento 344 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "344"
+       },
+       {
+        "type": "hash",
+        "valueString": "eae0443abaf6f7f1706ed9ccf3bd72b3ec982a553c56cad2f34ca18d6d571a84"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "6222209a9d1b431e10abff4c8b40e7fdf55e72e31a8b4484ad20f0f6fb3586ea"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "AuditEvent/audit-1-343",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-343",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "read",
+      "display": "read"
+     }
+    ],
+    "action": "R",
+    "recorded": "2026-11-09T19:59:17.527618+00:00",
+    "outcome": "0",
+    "outcomeDesc": "HTTP 200",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "medico"
+      },
+      "role": [
+       {
+        "text": "medico"
+       }
+      ],
+      "network": {
+       "address": "172.18.0.13",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "reference": "Patient/pac-AD1794254330s1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "1",
+       "display": "Person"
+      },
+      "detail": [
+       {
+        "type": "ruta",
+        "valueString": "/api/v2/pacientes/buscar"
+       }
+      ]
+     },
+     {
+      "what": {
+       "display": "evento 343 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "343"
+       },
+       {
+        "type": "hash",
+        "valueString": "6222209a9d1b431e10abff4c8b40e7fdf55e72e31a8b4484ad20f0f6fb3586ea"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "ab17790dc6719fbb3b7ede523c18d679ed6cd98ee1a7408ba899b6ae5b3f46ff"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "AuditEvent/audit-1-342",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-342",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "create",
+      "display": "create"
+     }
+    ],
+    "action": "C",
+    "recorded": "2026-11-09T19:59:17.509697+00:00",
+    "outcome": "0",
+    "outcomeDesc": "HTTP 200",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "admision"
+      },
+      "role": [
+       {
+        "text": "admisionista"
+       }
+      ],
+      "network": {
+       "address": "172.18.0.13",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "display": "evento 342 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "342"
+       },
+       {
+        "type": "hash",
+        "valueString": "ab17790dc6719fbb3b7ede523c18d679ed6cd98ee1a7408ba899b6ae5b3f46ff"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "e3b9c12add8ca2c93a90fb05401ab86398533a5a3021ee59ca13dbc4ce4392b9"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "AuditEvent/audit-1-341",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-341",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "create",
+      "display": "create"
+     }
+    ],
+    "action": "C",
+    "recorded": "2026-11-09T19:59:17.461336+00:00",
+    "outcome": "0",
+    "outcomeDesc": "HTTP 200",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "admision"
+      },
+      "role": [
+       {
+        "text": "admisionista"
+       }
+      ],
+      "network": {
+       "address": "172.18.0.13",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "display": "evento 341 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "341"
+       },
+       {
+        "type": "hash",
+        "valueString": "e3b9c12add8ca2c93a90fb05401ab86398533a5a3021ee59ca13dbc4ce4392b9"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "145afd95404f8abee115b97c446a4c8e1cc32ea2408618e3838cd15bac25b9a9"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "AuditEvent/audit-1-340",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-340",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "create",
+      "display": "create"
+     }
+    ],
+    "action": "C",
+    "recorded": "2026-11-09T19:58:52.174066+00:00",
+    "outcome": "0",
+    "outcomeDesc": "HTTP 200",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "sede"
+      },
+      "network": {
+       "address": "172.18.0.13",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "display": "evento 340 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "340"
+       },
+       {
+        "type": "hash",
+        "valueString": "145afd95404f8abee115b97c446a4c8e1cc32ea2408618e3838cd15bac25b9a9"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "ed10003e2c37c46914865ecfb7eaa43d8ac5971b44b1e01c2d4837b56b79ffa2"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "AuditEvent/audit-1-339",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-339",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "create",
+      "display": "create"
+     }
+    ],
+    "action": "C",
+    "recorded": "2026-11-09T19:58:51.952645+00:00",
+    "outcome": "0",
+    "outcomeDesc": "HTTP 200",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "admision"
+      },
+      "role": [
+       {
+        "text": "admisionista"
+       }
+      ],
+      "network": {
+       "address": "172.18.0.13",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "display": "evento 339 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "339"
+       },
+       {
+        "type": "hash",
+        "valueString": "ed10003e2c37c46914865ecfb7eaa43d8ac5971b44b1e01c2d4837b56b79ffa2"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "968ffd2f31969c838b8b374ced6ee530af1b985670bbe7741ca8669073f4bc34"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "fullUrl": "AuditEvent/audit-1-338",
+   "search": {
+    "mode": "match"
+   },
+   "resource": {
+    "resourceType": "AuditEvent",
+    "id": "audit-1-338",
+    "type": {
+     "system": "http://terminology.hl7.org/CodeSystem/audit-event-type",
+     "code": "rest",
+     "display": "Restful Operation"
+    },
+    "subtype": [
+     {
+      "system": "http://hl7.org/fhir/restful-interaction",
+      "code": "read",
+      "display": "read"
+     }
+    ],
+    "action": "R",
+    "recorded": "2026-11-09T19:58:51.893625+00:00",
+    "outcome": "4",
+    "outcomeDesc": "HTTP 403",
+    "agent": [
+     {
+      "requestor": true,
+      "who": {
+       "display": "medico"
+      },
+      "role": [
+       {
+        "text": "medico"
+       }
+      ],
+      "network": {
+       "address": "172.18.0.13",
+       "type": "2"
+      }
+     }
+    ],
+    "source": {
+     "site": "Sincelejo",
+     "observer": {
+      "display": "API v2 de la sede 1"
+     }
+    },
+    "entity": [
+     {
+      "what": {
+       "display": "evento 338 de la cadena de auditoría de la sede 1"
+      },
+      "type": {
+       "system": "http://terminology.hl7.org/CodeSystem/audit-entity-type",
+       "code": "4",
+       "display": "Other"
+      },
+      "detail": [
+       {
+        "type": "seq",
+        "valueString": "338"
+       },
+       {
+        "type": "hash",
+        "valueString": "968ffd2f31969c838b8b374ced6ee530af1b985670bbe7741ca8669073f4bc34"
+       },
+       {
+        "type": "hash_previo",
+        "valueString": "1c2ab42f39130ccc0eb2ef2f44adac86ead9e429c0fd61fe52c4eddd6580b448"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}
