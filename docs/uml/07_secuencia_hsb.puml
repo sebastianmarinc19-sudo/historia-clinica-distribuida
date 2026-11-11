@@ -1,0 +1,58 @@
+@startuml
+!include 00_estilo.iuml
+skinparam maxMessageSize 170
+title Secuencia: mensaje HL7 v2 o CSV a través del HSB hasta FHIR, con camino de error
+autonumber
+actor "Sistema\nde sede" as S
+participant "Gateway\n(TLS, JWT)" as G
+participant "HSB\n(API)" as B
+database "PG HSB\nmensaje_bus" as D
+participant "Normalizador\n(validador)" as N
+participant "Trabajador\nde entrega" as W
+participant "HAPI FHIR\n(sede)" as H
+participant "API de la sede\n(nodo)" as A
+
+== Recepción e idempotencia ==
+S -> G : POST /hsb/hl7  (o /hsb/csv?sede=N)
+G -> B : reenvía con el token de rol sistema_sede
+B -> D : INSERT mensaje_bus (clave = MSH-10 o sha256 de la fila)\nON CONFLICT DO NOTHING
+alt la clave ya existía
+  B --> S : 200 «duplicado» (no se crea nada, se cuenta en métricas)
+else mensaje nuevo
+  B -> N : valida: documento 4–15 dígitos, sexo M/F/O,\nsede 1–3, fecha, CIE-10, OBX con LOINC
+  alt inválido
+    N --> B : lista de motivos
+    B -> D : estado = rechazado + motivos + evento
+    B --> S : 422 «rechazado» (no se reintenta)
+  else válido
+    B -> D : estado = validado → transformado\n(canónico + Bundle transaction con PUT e ids deterministas)
+    note over B : primer intento de entrega dentro de la misma petición
+  end
+end
+
+== Entrega: primer intento en la petición; los reintentos los hace el trabajador ==
+W -> D : (reintentos) SELECT … FOR UPDATE SKIP LOCKED\n(listos y recuperación de los a medias)
+W -> H : POST Bundle transaction (PUT pac-…, enc-…, obs-…)
+alt HAPI responde 2xx
+  H --> W : 200
+  W -> D : hapi_ok = true
+else caído, timeout, 5xx o 429
+  H --> W : error
+  W -> D : estado = reintentando, espera = base·2^(n-1)
+  note right of W
+    Si se agotan los intentos:
+    estado = muerto (un administrador lo reencola).
+  end note
+end
+W -> A : upsert paciente, encuentro, diagnóstico, observaciones\n(usuario de servicio «hsb»; ids del cliente = idempotente)
+alt 2xx o «existente»
+  A --> W : 200 / 201
+  W -> D : nodo_ok = true → estado = entregado + evento
+  B --> S : 200 «entregado»
+else rechazo 4xx (409, 422)
+  A --> W : error de negocio
+  W -> D : estado = rechazado + motivo
+  B --> S : 422 «rechazado» + motivo
+end
+note over B, S : si el destino sigue caído, la respuesta al sistema de sede es 202 «reintentando»\ny el trabajador lo reintenta solo hasta entregarlo o declararlo «muerto»
+@enduml

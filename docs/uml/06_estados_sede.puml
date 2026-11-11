@@ -1,0 +1,14 @@
+@startuml
+!include 00_estilo.iuml
+title Estados operativos de una sede frente a fallos
+[*] --> Operativa
+state Operativa : escribe lo suyo · replica a los pares\nsirve la historia de todas las sedes
+state Aislada : sin red con los pares\nescribe lo suyo · sirve su copia\nWAL pendiente se acumula en los slots
+state Caida : base de datos caída\nlas otras sedes sirven su historia\n(solo lectura para sus registros)
+state Recuperando : reinicia con su disco\nlas suscripciones se reconectan\nse ponen al día solas
+Operativa --> Aislada : partición de red
+Aislada --> Recuperando : se restablece la red
+Operativa --> Caida : falla el pod / la base de datos
+Caida --> Recuperando : el pod se reprograma (RTO medido: 5,7 s)
+Recuperando --> Operativa : réplica al día (< 1 s medido)
+@enduml

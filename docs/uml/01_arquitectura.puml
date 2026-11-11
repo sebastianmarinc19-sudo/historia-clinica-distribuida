@@ -1,0 +1,53 @@
+@startuml
+!include 00_estilo.iuml
+title Arquitectura: tres sedes autónomas con replicación lógica entre sí
+
+actor "Personal clínico" as U
+node "Gateway nginx (2 réplicas)\nlecturas a cualquier sede sana · /sede/N" as GW
+node "Prometheus\nSLI / SLO" as PR
+
+package "Sede Sincelejo (id 1)" as S1 {
+  component "API v2\n(2 réplicas)" as A1
+  database "PostgreSQL 16\nhistoria_clinica + fhir_db" as P1
+  component "HAPI FHIR R4" as H1
+}
+package "Sede Cartagena (id 2)" as S2 {
+  component "API v2\n(2 réplicas)" as A2
+  database "PostgreSQL 16\nhistoria_clinica + fhir_db" as P2
+  component "HAPI FHIR R4" as H2
+}
+package "Sede Corozal (id 3)" as S3 {
+  component "API v2\n(2 réplicas)" as A3
+  database "PostgreSQL 16\nhistoria_clinica + fhir_db" as P3
+  component "HAPI FHIR R4" as H3
+}
+
+U -down-> GW
+GW -down-> S1
+GW -[hidden]down-> S2
+S1 -[hidden]down-> S2
+S2 -[hidden]down-> S3
+A1 -right-> P1
+H1 -left-> P1 : JDBC
+A1 .down.> H1 : FHIR
+A2 -right-> P2
+H2 -left-> P2 : JDBC
+A2 .down.> H2 : FHIR
+A3 -right-> P3
+H3 -left-> P3 : JDBC
+A3 .down.> H3 : FHIR
+GW -[#355C7D]-> A2
+GW -[#355C7D]-> A3
+P1 <-[#C0392B,bold]down-> P2 : replicación lógica
+P2 <-[#C0392B,bold]down-> P3 : replicación lógica
+P1 <-[#C0392B,bold]-> P3 : replicación lógica
+PR .left.> A1 : /metrics
+
+note right of S2
+  Cada fila clínica tiene UNA sede dueña
+  (la única que la escribe); las demás
+  reciben una copia de solo lectura.
+  El MPI se calcula en cada sede desde
+  esa copia, sin servicio central.
+end note
+@enduml

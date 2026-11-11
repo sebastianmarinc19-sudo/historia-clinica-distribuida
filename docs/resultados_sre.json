@@ -1,0 +1,178 @@
+{
+  "objetivos": {
+    "api_pod_en_seco_directo": true,
+    "api_pod_en_seco_gateway": true,
+    "rto_sede": true,
+    "lectura_gateway_en_caida": true,
+    "rpo_con_disco": true,
+    "particion_converge": true,
+    "replicacion_p95": true,
+    "carga_sin_errores": true,
+    "gateway_pod_en_seco": true,
+    "reconstruccion_sede": true,
+    "reconstruccion_sin_perdidas": true,
+    "lectura_gateway_en_reconstruccion": true
+  },
+  "experimentos": {
+    "api": {
+      "pod_eliminado": "api-5fdc4fb7d5-s8tl9",
+      "segundos_hasta_2_replicas_listas": 5.04,
+      "acceso_directo": {
+        "peticiones": 153,
+        "fallidas": 3,
+        "disponibilidad_pct": 98.039,
+        "max_fallos_seguidos": 1,
+        "codigos_fallidos": {
+          "0": 3
+        },
+        "errores_sin_codigo": [
+          [
+            0.0,
+            "<urlopen error [Errno 111] Connection refused>"
+          ],
+          [
+            0.0,
+            "<urlopen error [Errno 111] Connection refused>"
+          ],
+          [
+            3.0,
+            "<urlopen error timed out>"
+          ]
+        ],
+        "segundos_con_fallos": 0.4,
+        "latencia_p95_ms": 12.3
+      },
+      "via_gateway": {
+        "peticiones": 182,
+        "fallidas": 0,
+        "disponibilidad_pct": 100.0,
+        "max_fallos_seguidos": 0,
+        "codigos_fallidos": {},
+        "errores_sin_codigo": [],
+        "segundos_con_fallos": 0.0,
+        "latencia_p95_ms": 16.1
+      }
+    },
+    "rpo": {
+      "escrituras_confirmadas": 81,
+      "escrituras_rechazadas_durante_la_caida": 3,
+      "confirmadas_antes_de_caer": 60,
+      "expuestas_sin_replicar_en_cartagena": 0,
+      "expuestas_sin_replicar_en_corozal": 0,
+      "ventana_rpo_estimada_s": 0.0,
+      "perdidas_tras_reiniciar": 0,
+      "confirmadas_en_servidor_sin_ack_al_cliente": 0,
+      "rto_base_sede_s": 2.7,
+      "segundos_hasta_convergencia_total": 0.14,
+      "gateway": {
+        "peticiones": 161,
+        "fallidas": 0,
+        "disponibilidad_pct": 100.0,
+        "max_fallos_seguidos": 0,
+        "codigos_fallidos": {},
+        "errores_sin_codigo": [],
+        "segundos_con_fallos": 0.0,
+        "latencia_p95_ms": 35.8
+      },
+      "sede_1": {
+        "peticiones": 87,
+        "fallidas": 4,
+        "disponibilidad_pct": 95.402,
+        "max_fallos_seguidos": 4,
+        "codigos_fallidos": {
+          "503": 4
+        },
+        "errores_sin_codigo": [],
+        "segundos_con_fallos": 1.0,
+        "latencia_p95_ms": 659.1
+      },
+      "cartagena_acepta_escrituras_con_sincelejo_caida": true
+    },
+    "particion": {
+      "escrituras_sincelejo": 8,
+      "escrituras_cartagena": 8,
+      "particion_real": true,
+      "corozal_sigue_recibiendo_de_cartagena": true,
+      "lag_slots_sincelejo_bytes_durante_particion": 51968.0,
+      "segundos_hasta_convergencia": 0.6
+    },
+    "latencia_replicacion": {
+      "muestras": 80,
+      "p50_ms": 14.8,
+      "p95_ms": 21.4,
+      "max_ms": 28.3,
+      "nota": "incluye la latencia HTTP de escribir y de consultar (≈ decenas de ms)"
+    },
+    "carga": {
+      "lecturas": 1554,
+      "lecturas_por_s": 61.8,
+      "lecturas_errores": 0,
+      "lectura_p50_ms": 217.7,
+      "lectura_p95_ms": 570.5,
+      "lectura_p99_ms": 899.5,
+      "escrituras": 742,
+      "escrituras_por_s": 29.5,
+      "escrituras_errores": 0,
+      "escritura_p50_ms": 169.2,
+      "escritura_p95_ms": 483.1,
+      "escritura_p99_ms": 639.1,
+      "max_wal_pendiente_bytes": 254120.0,
+      "segundos_hasta_drenar_replicas": 0.2,
+      "transacciones_por_minuto": 5475
+    },
+    "sli_prometheus": {
+      "1": {
+        "peticiones": 1590,
+        "errores_5xx": 20,
+        "disponibilidad_pct": 98.734,
+        "p95_s": 0.641
+      },
+      "3": {
+        "peticiones": 1205,
+        "errores_5xx": 0,
+        "disponibilidad_pct": 100.0,
+        "p95_s": 0.469
+      },
+      "2": {
+        "peticiones": 1238,
+        "errores_5xx": 0,
+        "disponibilidad_pct": 100.0,
+        "p95_s": 0.497
+      }
+    },
+    "gateway": {
+      "peticiones": 153,
+      "fallidas": 0,
+      "disponibilidad_pct": 100.0,
+      "max_fallos_seguidos": 0,
+      "codigos_fallidos": {},
+      "errores_sin_codigo": [],
+      "segundos_con_fallos": 0.0,
+      "latencia_p95_ms": 22.0
+    },
+    "reconstruccion": {
+      "pacientes_antes": 9073,
+      "base_nueva_pacientes": 0,
+      "segundos_hasta_base_vacia": 6.9,
+      "segundos_reconstruccion": 20.7,
+      "segundos_desde_el_desastre": 27.6,
+      "script_ok": true,
+      "huellas_iguales_con_sincelejo": true,
+      "segundos_hasta_igualar": 0.61,
+      "escrituras_confirmadas_en_sincelejo_durante": 178,
+      "escrituras_rechazadas": 0,
+      "pacientes_sincelejo_al_final": 6678,
+      "gateway": {
+        "peticiones": 356,
+        "fallidas": 0,
+        "disponibilidad_pct": 100.0,
+        "max_fallos_seguidos": 0,
+        "codigos_fallidos": {},
+        "errores_sin_codigo": [],
+        "segundos_con_fallos": 0.0,
+        "latencia_p95_ms": 23.7
+      }
+    }
+  },
+  "ultima_corrida": 1794063177
+}

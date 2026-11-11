@@ -1,0 +1,43 @@
+@startuml
+!include 00_estilo.iuml
+skinparam maxMessageSize 170
+title Secuencia: registro, migración a FHIR y consulta federada
+autonumber
+actor "Médico\nSincelejo" as U1
+participant "API\nSincelejo" as A1
+database "PG\nSincelejo" as P1
+participant "HAPI\nSincelejo" as H1
+database "PG Cartagena\n(réplica)" as P2
+participant "API\nCartagena" as A2
+actor "Médico\nCartagena" as U2
+
+== CU-01 a CU-09 · registro en la sede dueña ==
+U1 -> A1 : POST /pacientes, /encuentros,\n/diagnosticos, /egreso …
+A1 -> P1 : INSERT (id_sede_origen = 1)
+A1 --> U1 : 201 Created
+P1 -[#C0392B]-> P2 : replica la fila\n(asíncrono, ~25 ms)
+
+== CU-10 / CU-12 · migración y RDA ==
+U1 -> A1 : POST /migracion/encuentro/{id}
+A1 -> P1 : lee encuentro, paciente\ny registros hijos
+A1 -> H1 : POST /Patient
+H1 --> A1 : id del Patient
+A1 -> A1 : construir_rda()\nBundle document, Composition primero
+A1 -> H1 : POST /Bundle
+H1 --> A1 : id del Bundle
+A1 -> P1 : guarda composicion_bundle\nestado_migracion = MIGRADO
+A1 -> P1 : CU-11 resolver_identidad()
+A1 --> U1 : 200 · MIGRADO · id_mpi
+P1 -[#C0392B]-> P2 : replica bundle y estado
+
+== CU-13 · consulta federada desde otra sede ==
+U2 -> A2 : GET /historia-federada/{documento}
+A2 -> P2 : pacientes con ese documento\n(copia local)
+A2 -> P2 : resolver_identidad()\n→ mismo id_mpi (determinista)
+A2 -> P2 : encuentros de todos los miembros\n+ fhir_bundle_id
+A2 --> U2 : historia consolidada\n(es_replica = true)
+note over A2, P2
+  No consulta a Sincelejo:
+  funciona aunque esa sede esté caída.
+end note
+@enduml

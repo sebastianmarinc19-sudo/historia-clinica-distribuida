@@ -1,0 +1,22 @@
+@startuml
+!include 00_estilo.iuml
+title Estados de un encuentro: atención y migración a FHIR
+[*] --> Abierto : CU-02 abrir encuentro\n(estado_migracion = PENDIENTE)
+state Abierto {
+  [*] --> EnAtencion
+  EnAtencion : triage, diagnósticos, tecnologías,\nentregas, resultados, antecedentes
+}
+Abierto --> Cerrado : CU-09 registrar egreso\n(fecha_hora_fin ≥ fecha_hora_inicio)
+state Cerrado {
+  [*] --> PENDIENTE
+  PENDIENTE --> MIGRADO : CU-10 el HAPI FHIR acepta el Bundle
+  PENDIENTE --> ERROR : HAPI no disponible o rechaza
+  ERROR --> MIGRADO : reintento de la migración
+  MIGRADO --> MIGRADO : re-generación idempotente del RDA
+}
+Cerrado --> [*]
+note right of Cerrado
+  La restricción CHECK de la base solo admite
+  PENDIENTE, MIGRADO o ERROR.
+end note
+@enduml

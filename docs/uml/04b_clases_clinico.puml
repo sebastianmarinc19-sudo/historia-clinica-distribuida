@@ -1,0 +1,71 @@
+@startuml
+!include 00_estilo.iuml
+hide empty methods
+skinparam ClassAttributeIconSize 0
+left to right direction
+title Diagrama de clases (2/2): detalle clínico del encuentro
+
+class Encuentro {
+  id_encuentro : UUID
+  fecha_hora_inicio / fin
+  modalidad, grupo de servicio,
+  entorno, vía de ingreso, causa
+  entidad_responsable
+  estado_migracion
+}
+class Triage {
+  fecha_hora_triage
+  cod_triage
+}
+class Egreso {
+  cod_condicion_egreso
+  días de incapacidad / licencia
+  prestador de referencia
+}
+class DiagnosticoEncuentro {
+  cod_cie10
+  tipo : IN | EP | RE | CO | CM
+  fecha_diagnostico
+}
+class TecnologiaEncuentro {
+  cod_tecnologia
+  cod_finalidad
+  fecha_prescripcion
+}
+class MedicamentoPrescrito {
+  cod_medicamento
+  dosis, vía,
+  duración, frecuencia
+}
+class EntregaTecnologia {
+  fecha_entrega
+  dosis administrada / entregada
+  unidades_entregadas
+}
+class Observacion {
+  cod_loinc
+  valor numérico o texto, unidad
+}
+class AntecedenteSalud {
+  cod_cie10 o descripción
+}
+class ExposicionRiesgo {
+  cod_factor_riesgo
+}
+class ProfesionalSalud {
+  id_profesional : UUID
+  nombres, apellidos
+}
+
+Encuentro "1" -- "0..1" Triage
+Encuentro "1" -- "0..1" Egreso
+Encuentro "1" -- "*" DiagnosticoEncuentro
+Encuentro "1" -- "*" TecnologiaEncuentro
+Encuentro "1" -- "*" Observacion
+Encuentro "1" -- "*" AntecedenteSalud
+Encuentro "1" -- "*" ExposicionRiesgo
+TecnologiaEncuentro "1" -- "0..1" MedicamentoPrescrito : si es\nmedicamento
+TecnologiaEncuentro "1" -- "*" EntregaTecnologia
+ProfesionalSalud "1" -- "*" Egreso : firma
+ProfesionalSalud "1" -- "*" EntregaTecnologia : realiza
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+!include 00_estilo.iuml
+title Estados de un mensaje del HSB
+[*] --> recibido : POST /hsb/hl7 o /hsb/csv\n(clave nueva)
+[*] --> [*] : clave repetida → «duplicado»\n(no crea mensaje)
+recibido --> validado : el normalizador acepta el contenido
+recibido --> rechazado : documento, sexo, sede, fecha o CIE-10 inválidos
+validado --> transformado : canónico + Bundle FHIR
+transformado --> entregado : HAPI y API de la sede aceptan
+transformado --> reintentando : destino caído, timeout, 5xx, 429
+reintentando --> entregado : un intento posterior funciona\n(sin duplicar: PUT e ids deterministas)
+reintentando --> reintentando : falla otra vez\nespera = base·2^(n-1) con tope
+reintentando --> muerto : se agotan los intentos
+reintentando --> rechazado : el destino responde 4xx de negocio
+muerto --> reintentando : reencolar (solo administrador)
+entregado --> [*]
+rechazado --> [*]
+note right of muerto
+  Un reinicio del HSB no pierde estados:
+  viven en PostgreSQL y el trabajador
+  recupera los mensajes a medias.
+end note
+@enduml

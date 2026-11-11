@@ -1,0 +1,95 @@
+@startuml
+!include 00_estilo.iuml
+left to right direction
+skinparam nodesep 12
+skinparam ranksep 40
+title Casos de uso CU-01 a CU-15 organizados en las cuatro vistas
+
+actor "Admisionista" as ADM
+actor "Médico" as MED
+actor "Paciente" as PAC
+actor "Reportero\n(auditor)" as REP
+actor "Administrador" as ADMIN
+actor "Sistema de sede\n(HL7 v2 / CSV)" as SIS
+actor "HAPI FHIR\n(sistema externo)" as FHIR
+
+rectangle "Vista del Admisionista" as VA {
+  usecase "CU-01 Registrar paciente" as C1
+  usecase "CU-02 Abrir el encuentro" as C2
+  usecase "CU-03 Registrar triage" as C3
+}
+rectangle "Vista del Médico" as VM {
+  usecase "CU-04 Registrar diagnósticos" as C4
+  usecase "CU-05 Prescribir tecnología" as C5
+  usecase "CU-06 Registrar entrega o aplicación" as C6
+  usecase "CU-07 Registrar resultados" as C7
+  usecase "CU-08 Registrar antecedentes y riesgos" as C8
+  usecase "CU-09 Registrar egreso" as C9
+  usecase "CU-10 Migrar a FHIR" as C10
+  usecase "CU-11 Resolver identidad federada (MPI)" as C11
+  usecase "CU-12 Generar / consultar RDA" as C12
+  usecase "CU-13 Consultar historia entre sedes" as C13
+}
+rectangle "Vista del Paciente (solo lectura)" as VP {
+  usecase "Consultar mi historia\n(comparte CU-13)" as P13
+  usecase "Descargar mi RDA\n(comparte CU-12)" as P12
+  usecase "Ver quién accedió\na mi historia" as P20
+}
+rectangle "Bus de integración (HSB)" as VB {
+  usecase "Enviar mensaje HL7 v2\n(ADT / ORU)" as B1
+  usecase "Enviar archivo CSV legado" as B2
+  usecase "Consultar estado de los mensajes" as B3
+  usecase "Reencolar mensaje muerto" as B4
+}
+rectangle "Vista del Reportero" as VR {
+  usecase "CU-14 Cobertura de migración" as C14
+  usecase "CU-15 Auditoría de 57 campos" as C15
+  usecase "Estado de la réplica entre sedes" as C16
+  usecase "Reporte de historia clínica\nde un paciente (con sello SHA-256)" as C17
+  usecase "Verificar la cadena de auditoría" as C18
+  usecase "Estado de la plataforma" as C19
+}
+
+ADM --> C1
+ADM --> C2
+ADM --> C3
+MED --> C4
+MED --> C5
+MED --> C6
+MED --> C7
+MED --> C8
+MED --> C9
+MED --> C10
+MED --> C12
+MED --> C13
+PAC --> P13
+PAC --> P12
+PAC --> P20
+SIS --> B1
+SIS --> B2
+ADM --> B3
+MED --> B3
+REP --> B3
+ADMIN --> B4
+B1 ..> C1 : <<include>>\nentrega a la API de la sede
+B2 ..> C1 : <<include>>
+REP --> C14
+REP --> C15
+REP --> C16
+REP --> C17
+REP --> C18
+REP --> C19
+MED --> C19
+MED --> C18
+C17 ..> C12 : descarga el RDA
+C10 ..> C11 : <<include>>
+C10 ..> C12 : <<include>>
+C13 ..> C11 : <<include>>
+C10 --> FHIR
+C12 --> FHIR
+
+VA -[hidden]down-> VM
+VM -[hidden]down-> VP
+VP -[hidden]down-> VB
+VB -[hidden]down-> VR
+@enduml

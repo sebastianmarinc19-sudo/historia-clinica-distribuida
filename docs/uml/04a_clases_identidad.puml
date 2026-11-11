@@ -1,0 +1,61 @@
+@startuml
+!include 00_estilo.iuml
+hide empty methods
+skinparam ClassAttributeIconSize 0
+title Diagrama de clases (1/2): organización, identidad y federación
+
+class Prestador {
+  cod_prestador : String
+  nombre : String
+}
+class Sede {
+  id_sede : int
+  nombre_ciudad : String
+  vendor_his, vendor_emr,
+  vendor_lis_pacs
+}
+class ProfesionalSalud {
+  id_profesional : UUID
+  id_sede_origen : int
+  tipo y número de documento
+  nombres, apellidos
+}
+class Paciente {
+  id_paciente : UUID
+  id_sede_origen : int
+  tipo y número de documento
+  primer/segundo nombre y apellido
+  fecha_hora_nacimiento
+  sexo, etnia, residencia …
+  fhir_patient_id : String [0..1]
+}
+class IdentidadFederada <<derivada, no se replica>> {
+  id_mpi : UUID
+  score_coincidencia
+}
+class DecisionMPI <<se replica>> {
+  decision : MISMA_PERSONA | PERSONAS_DISTINTAS
+  decidido_por, motivo
+  fecha_decision
+  vale la más reciente por par
+}
+class Encuentro {
+  id_encuentro : UUID
+  estado_migracion
+  (detalle en la figura 2/2)
+}
+class ComposicionBundle {
+  fhir_bundle_id
+  bundle_json : JSONB
+  fecha_generacion
+}
+
+Prestador "1" -- "1..*" Sede : opera
+Sede "1" -- "*" Paciente : registra
+Sede "1" -- "*" ProfesionalSalud : emplea
+Sede "1" -- "*" Encuentro : atiende
+Paciente "1" -- "*" Encuentro : tiene
+IdentidadFederada "1" -- "2..*" Paciente : agrupa\n(mismo documento\no decisión)
+DecisionMPI "*" -- "2" Paciente : confirma o separa\nun par
+Encuentro "1" -- "0..1" ComposicionBundle : genera RDA
+@enduml

@@ -1,0 +1,56 @@
+@startuml
+!include 00_estilo.iuml
+hide empty methods
+skinparam ClassAttributeIconSize 0
+title Diagrama de clases (3/3): bus de integración (HSB)
+
+class MensajeBus {
+  id_mensaje : UUID
+  clave : String <<única>>
+  hash_contenido : String
+  formato : HL7 | CSV
+  tipo, sede, documento
+  estado : recibido | validado | transformado |\n  entregado | rechazado | reintentando | muerto
+  contenido : String
+  motivos : JSON
+  canonico, bundle : JSON
+  hapi_ok, nodo_ok : boolean
+  intentos, proximo_intento, ultimo_error
+  duplicados : int
+  recibido_en, actualizado_en, entregado_en
+}
+class EventoMensaje {
+  id_evento : long
+  fecha : timestamptz
+  estado : String
+  intento : int
+  detalle : String
+}
+class RefTerminologia {
+  dx_local : String
+  cie10 : String
+  descripcion : String
+}
+class MensajeCanonico <<en memoria>> {
+  tipo, sede, documento
+  paciente, encuentro
+  diagnósticos, observaciones
+}
+class Normalizador {
+  validar(mensaje) : motivos
+  a_canonico(HL7 | fila CSV)
+}
+class ConstructorFhir {
+  bundle_transaction(canónico)
+  ids deterministas:\npac-<doc>, enc-<sede>-<visita>, obs-<msg>-<n>
+}
+class Destino <<HAPI | API de la sede>> {
+  entregar(bundle | canónico)
+}
+
+MensajeBus "1" *-- "0..*" EventoMensaje : bitácora de transiciones
+Normalizador ..> RefTerminologia : dx local → CIE-10
+Normalizador ..> MensajeCanonico : produce
+ConstructorFhir ..> MensajeCanonico : lee
+MensajeBus ..> Destino : se entrega con reintentos
+@enduml
