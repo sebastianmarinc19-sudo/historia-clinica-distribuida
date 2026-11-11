@@ -426,6 +426,7 @@ tabla_con_pie(["Vista", "Casos de uso", "Evidencia"], [
 
 # ====================================================================== PROTOTIPO
 add(h1("PROTOTIPO FINAL"))
+par("**Código fuente.** https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida (público; rama `reingenieria-3-sedes`, etiqueta `v1.0`). Las instrucciones para clonarlo y ejecutarlo están en el Anexo A.")
 par("**Entorno.** Un portátil con 4 vCPU y 5,7 GiB de RAM, Ubuntu 24.04, Docker 29 y un clúster Minikube de un nodo (2,8 GB). Tres namespaces de sede, un namespace de "
     "gateway y uno de observabilidad. Cada sede tiene un StatefulSet de PostgreSQL con disco persistente, un Deployment de API con dos réplicas, un Job que crea las "
     "suscripciones y, solo en Sincelejo, un HAPI FHIR (los otros dos no caben en la memoria disponible; esas sedes degradan a «FHIR no disponible» y siguen registrando).")
@@ -685,6 +686,13 @@ add(p("Verificación de las referencias (7 de noviembre de 2026): cada una se co
 # ====================================================================== ANEXOS
 add(h1("ANEXOS"))
 add(h2("Anexo A. Estructura del repositorio y cómo reproducir"))
+par("**Repositorio (público):** https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida · rama `reingenieria-3-sedes` · versión entregada: etiqueta `v1.0`. Para obtenerlo y ejecutarlo desde cero (solo Docker):")
+add(codigo("""
+git clone --branch reingenieria-3-sedes https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida.git
+cd historia-clinica-distribuida
+docker compose up -d --build
+bash scripts/demo.sh
+"""))
 add(codigo("""
 historia-clinica-distribuida/            (rama reingenieria-3-sedes)
   app/         API v2 de cada sede: hc_api/ (main, auth, auditoria, mpi, fhir, reporte, campos57, static/ = vistas)

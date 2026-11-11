@@ -19,6 +19,7 @@ Para lo que solo puede hacer el equipo (commits reales de ambos, repositorio pú
 ## Ejecución desde cero (solo Docker)
 
 ```bash
+git clone --branch reingenieria-3-sedes https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida.git && cd historia-clinica-distribuida   # 0. obtener el código
 docker compose up -d --build        # 1. levanta todo: 3 sedes + réplica, HAPI FHIR, bus HSB y gateway TLS (claves y certificados incluidos)
 python3 scripts/datos_demo.py        # 2. datos sintéticos: el paciente 7000001 queda atendido en las tres sedes
 bash scripts/demo.sh                 # 3. guion de la demostración paso a paso (Enter avanza; --sin-pausas de corrido)
