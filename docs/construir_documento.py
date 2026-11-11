@@ -67,7 +67,8 @@ add(p(TITULO.upper(), jc="center", b=True, despues=120))
 add(p(f"Autores: {AUTORES}", jc="center"))
 add(p("Sincelejo, Colombia", jc="center"))
 add(p("Correo electrónico: maceadmon@gmail.com", jc="center"))
-add(p("Sistemas Distribuidos · Docente: Jaider Reyes · Corporación Universitaria Antonio José de Sucre (UAJS)", jc="center", despues=200, sz=21))
+add(p("Sistemas Distribuidos · Docente: Jaider Reyes · Corporación Universitaria Antonio José de Sucre (UAJS)", jc="center", sz=21))
+add(p("Repositorio: https://github.com/sebastianmarinc19-sudo/historia-clinica-distribuida (rama reingenieria-3-sedes)", jc="center", despues=200, sz=21))
 
 # ====================================================================== RESUMEN
 add(h1("RESUMEN / ABSTRACT"))
