@@ -50,7 +50,7 @@ jobs:
         run: python3 scripts/sre_k8s.py
       - name: Resultados
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: resultados-sre
           path: docs/resultados_sre.json

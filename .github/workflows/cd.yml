@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/empaquetar_manifiestos.sh "${{ needs.imagen.outputs.referencia }}" dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: manifiestos-k8s
           path: dist/

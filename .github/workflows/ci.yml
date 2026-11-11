@@ -103,7 +103,7 @@ jobs:
           bash scripts/respaldos.sh verificar
       - name: Capturas de las pruebas E2E que fallaron
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-capturas
           path: tests/e2e/salida/
