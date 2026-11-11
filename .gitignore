@@ -42,3 +42,12 @@ npm-debug.log*
 # Environment variables
 .env
 .env.local
+
+# Copias de seguridad locales
+respaldos/
+
+# Credenciales de laboratorio generadas (claves en claro)
+credenciales/*
+!credenciales/LEEME.md
+tests/e2e/salida/
+.ruff_cache/
