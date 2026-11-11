@@ -1,0 +1,356 @@
+# Historia clínica distribuida: 3 sedes autónomas con replicación lógica, HAPI FHIR por sede, bus de integración (HSB) y gateway TLS.
+#
+#   docker compose up -d --build        # un solo comando, desde un clon limpio: no hay pasos previos
+#   docker compose down -v              # lo borra todo (datos incluidos); el siguiente `up` empieza de cero
+#
+# El servicio `init` crea la primera vez las claves aleatorias y los certificados de laboratorio en ./credenciales/ (ignorada por git) y deja a
+# cada servicio solo los secretos que necesita (credenciales/runtime/...). Las claves en claro: credenciales/credenciales.json o
+# `python3 scripts/credenciales.py`. La CA para los clientes: credenciales/ca.crt (curl --cacert; para el navegador, importarla).
+# Por defecto corre solo el HAPI de Sincelejo (como en Kubernetes: cada HAPI pide ~700 MB). Con RAM de sobra, uno por sede:
+#   docker compose --profile fhir-completo up -d
+# Entrada: https://localhost:8443 (vistas en /sede/1/vistas/, /sede/2/vistas/, /sede/3/vistas/; bus en /hsb/; /health y /metrics del gateway).
+#
+# Cada sede tiene su propio PostgreSQL y replica sus filas a las otras
+# dos (malla completa). Si una sede se cae o se aísla, las demás siguen
+# sirviendo todos los datos y la sede aislada sigue operando con los
+# suyos; al volver se pone al día sola.
+#
+# Por sede: PostgreSQL + HAPI FHIR + API v2. Un gateway nginx reparte las
+# lecturas entre las sedes sanas y permite apuntar a una sede concreta
+# (/sede/1, /sede/2, /sede/3).
+name: hc-sedes
+
+x-sede: &sede
+  image: postgres:16-alpine
+  restart: unless-stopped
+  environment: &sede-env
+    POSTGRES_USER: ${POSTGRES_USER:-admin}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+    POSTGRES_DB: historia_clinica
+    REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-repl_secret}
+  command:
+    - postgres
+    - -c
+    - wal_level=logical
+    - -c
+    - max_wal_senders=10
+    - -c
+    - max_replication_slots=10
+    - -c
+    - max_logical_replication_workers=8
+    - -c
+    - max_worker_processes=16
+    # Acota el WAL retenido para un par caído (protege el disco).
+    - -c
+    - max_slot_wal_keep_size=1GB
+    # Detección rápida de pares caídos o aislados.
+    - -c
+    - wal_sender_timeout=10s
+    - -c
+    - wal_receiver_timeout=10s
+    - -c
+    - wal_retrieve_retry_interval=2s
+  healthcheck:
+    # -h 127.0.0.1 fuerza TCP: el servidor temporal de init solo escucha
+    # por socket Unix, así que no se marca sano antes de terminar el init.
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-admin} -d historia_clinica"]
+    interval: 3s
+    timeout: 3s
+    retries: 20
+  networks: [sedes_net]
+
+x-hapi: &hapi
+  image: hapiproject/hapi:v6.8.0
+  restart: unless-stopped
+  mem_limit: 880m               # montón 400 MB (con 320 MB las recolecciones completas dominaban el tiempo) + metaspace 256 MB + hilos y código; con 700 MB el validador (`$validate`) agotaba el metaspace
+  networks: [sedes_net]
+  environment: &hapi-env
+    JAVA_TOOL_OPTIONS: "-Xmx400m -XX:MaxMetaspaceSize=256m"
+    spring.datasource.username: ${POSTGRES_USER:-admin}
+    spring.datasource.password: ${POSTGRES_PASSWORD:-admin}
+    spring.datasource.driverClassName: org.postgresql.Driver
+    spring.jpa.properties.hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+    hapi.fhir.fhir_version: R4
+    hapi.fhir.allow_external_references: "true"
+
+x-api: &api
+  image: hc-api:local            # la construye api_sincelejo; las demás la reutilizan
+  pull_policy: never
+  restart: unless-stopped
+  networks: [sedes_net]
+  environment: &api-env
+    DB_PORT: "5432"
+    DB_NAME: historia_clinica
+    DB_USER: ${POSTGRES_USER:-admin}
+    DB_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+    FHIR_TIMEOUT: "45"      # la primera escritura en HAPI puede tardar con poca RAM
+    DB_CONNECT_TIMEOUT: "1" # falla rápido si la base cae: el gateway reintenta en otra sede a tiempo
+    # Autenticación: los secretos los crea el servicio `init` y llegan como archivos (no como variables en claro)
+    HC_JWT_SECRETO_FILE: /run/hc/jwt
+    HC_USUARIOS_B64_FILE: /run/hc/usuarios_b64
+    # Anclaje de la cabeza de la auditoría: cada sede la publica en las otras (la propia se descarta sola).
+    HC_PARES: "1=http://api_sincelejo:8001,2=http://api_cartagena:8001,3=http://api_corozal:8001"
+  volumes:
+    - ./credenciales/runtime/api:/run/hc:ro
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health/live', timeout=2)"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+
+services:
+  # Tarea de una sola ejecución: crea (o reutiliza) las claves y los certificados de laboratorio antes que cualquier servicio que los use.
+  init:
+    build: ./infra/init
+    image: hc-init:local
+    container_name: hc_init
+    restart: "no"
+    environment:
+      GATEWAY_IP_EXTRA: ${GATEWAY_IP_EXTRA:-}      # IP o nombre adicional del certificado si se accede desde otro equipo (ver .env.example)
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./credenciales:/app/credenciales
+
+  pg_sincelejo:
+    <<: *sede
+    container_name: pg_sincelejo
+    ports: ["5441:5432"]
+    volumes:
+      - pg_sincelejo_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+
+  pg_cartagena:
+    <<: *sede
+    container_name: pg_cartagena
+    ports: ["5442:5432"]
+    volumes:
+      - pg_cartagena_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+
+  pg_corozal:
+    <<: *sede
+    container_name: pg_corozal
+    ports: ["5443:5432"]
+    volumes:
+      - pg_corozal_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+
+  # Tarea de una sola ejecución: crea las suscripciones cruzadas.
+  replicacion_setup:
+    image: postgres:16-alpine
+    container_name: hc_replicacion_setup
+    depends_on:
+      pg_sincelejo: {condition: service_healthy}
+      pg_cartagena: {condition: service_healthy}
+      pg_corozal:   {condition: service_healthy}
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_DB: historia_clinica
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-repl_secret}
+    volumes:
+      - ./scripts/configurar_suscripciones.sh:/configurar_suscripciones.sh:ro
+    entrypoint: ["sh", "/configurar_suscripciones.sh"]
+    restart: "no"
+    networks: [sedes_net]
+
+  # ------------------------------------------------------------------
+  # HAPI FHIR por sede: cada sede tiene su propio servidor FHIR y su
+  # propia base fhir_db (sin punto único de falla). El RDA se guarda
+  # además como JSONB en composicion_bundle, que sí se replica.
+  # ------------------------------------------------------------------
+  hapi_sincelejo:
+    <<: *hapi
+    container_name: hapi_sincelejo
+    depends_on: {pg_sincelejo: {condition: service_healthy}}
+    networks:
+      sedes_net:
+        aliases: [hapi-sincelejo]    # Tomcat rechaza nombres de host con '_'
+    environment:
+      <<: *hapi-env
+      spring.datasource.url: jdbc:postgresql://pg_sincelejo:5432/fhir_db
+    ports: ["8081:8080"]
+
+  hapi_cartagena:
+    <<: *hapi
+    container_name: hapi_cartagena
+    profiles: ["fhir-completo"]      # opcional: un HAPI por sede necesita unos 2 GB más de RAM
+    depends_on: {pg_cartagena: {condition: service_healthy}}
+    networks:
+      sedes_net:
+        aliases: [hapi-cartagena]    # Tomcat rechaza nombres de host con '_'
+    environment:
+      <<: *hapi-env
+      spring.datasource.url: jdbc:postgresql://pg_cartagena:5432/fhir_db
+    ports: ["8082:8080"]
+
+  hapi_corozal:
+    <<: *hapi
+    container_name: hapi_corozal
+    profiles: ["fhir-completo"]      # opcional: un HAPI por sede necesita unos 2 GB más de RAM
+    depends_on: {pg_corozal: {condition: service_healthy}}
+    networks:
+      sedes_net:
+        aliases: [hapi-corozal]    # Tomcat rechaza nombres de host con '_'
+    environment:
+      <<: *hapi-env
+      spring.datasource.url: jdbc:postgresql://pg_corozal:5432/fhir_db
+    ports: ["8083:8080"]
+
+  # ------------------------------------------------------------------
+  # API v2 por sede. Depende de su base, no de HAPI: el registro clínico
+  # sigue funcionando aunque el servidor FHIR esté caído.
+  # ------------------------------------------------------------------
+  api_sincelejo:
+    <<: *api
+    build: ./app
+    container_name: api_sincelejo
+    depends_on: {pg_sincelejo: {condition: service_healthy}, init: {condition: service_completed_successfully}}
+    environment:
+      <<: *api-env
+      SEDE_ID: "1"
+      DB_HOST: pg_sincelejo
+      FHIR_BASE_URL: http://hapi-sincelejo:8080/fhir
+    ports: ["8101:8001"]
+
+  api_cartagena:
+    <<: *api
+    container_name: api_cartagena
+    depends_on: {pg_cartagena: {condition: service_healthy}, init: {condition: service_completed_successfully}}
+    environment:
+      <<: *api-env
+      SEDE_ID: "2"
+      DB_HOST: pg_cartagena
+      FHIR_BASE_URL: http://hapi-cartagena:8080/fhir
+    ports: ["8102:8001"]
+
+  api_corozal:
+    <<: *api
+    container_name: api_corozal
+    depends_on: {pg_corozal: {condition: service_healthy}, init: {condition: service_completed_successfully}}
+    environment:
+      <<: *api-env
+      SEDE_ID: "3"
+      DB_HOST: pg_corozal
+      FHIR_BASE_URL: http://hapi-corozal:8080/fhir
+    ports: ["8103:8001"]
+
+  # ------------------------------------------------------------------
+  # Bus de integración (HSB): HL7 v2 y CSV de las sedes -> validación -> FHIR -> HAPI y API de la sede.
+  # Su cola e idempotencia viven en su propia base (pg_hsb), así que reiniciarlo no pierde mensajes.
+  # ------------------------------------------------------------------
+  pg_hsb:
+    image: postgres:16-alpine
+    container_name: pg_hsb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hsb
+      POSTGRES_PASSWORD_FILE: /run/hc/hsb_db
+      POSTGRES_DB: hsb
+    depends_on: {init: {condition: service_completed_successfully}}
+    volumes:
+      - pg_hsb_data:/var/lib/postgresql/data
+      - ./credenciales/runtime/pg_hsb:/run/hc:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U hsb -d hsb"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [sedes_net]
+
+  hsb:
+    build: ./hsb
+    image: hc-hsb:local
+    container_name: hsb
+    restart: unless-stopped
+    depends_on: {pg_hsb: {condition: service_healthy}, init: {condition: service_completed_successfully}}
+    volumes: ["./credenciales/runtime/hsb:/run/hc:ro"]
+    environment:
+      HSB_DB_HOST: pg_hsb
+      HSB_DB_PASSWORD_FILE: /run/hc/hsb_db
+      HC_JWT_SECRETO_FILE: /run/hc/jwt
+      HSB_CLAVE_FILE: /run/hc/clave_hsb
+      # HAPI de Sincelejo para todas las sedes (RAM); con un HAPI por sede: HSB_FHIR_URLS="1=http://hapi-sincelejo:8080/fhir,2=…,3=…"
+      HSB_FHIR_URL: http://hapi-sincelejo:8080/fhir
+      HSB_API_URLS: "1=http://api_sincelejo:8001,2=http://api_cartagena:8001,3=http://api_corozal:8001"
+      HSB_MAX_INTENTOS: "12"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports: ["8000:8000"]
+    networks: [sedes_net]
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: hc_gateway
+    restart: unless-stopped
+    depends_on:
+      init: {condition: service_completed_successfully}
+      hsb: {condition: service_healthy}
+      api_sincelejo: {condition: service_healthy}
+      api_cartagena: {condition: service_healthy}
+      api_corozal:   {condition: service_healthy}
+    volumes:
+      - ./infra/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./credenciales/runtime/gateway:/etc/nginx/tls:ro                # gateway.crt y gateway.key, los crea el servicio `init`
+    ports: ["8100:80", "8443:443"]
+    networks: [sedes_net]
+
+  # Exportador oficial de métricas de nginx: el gateway lo publica en /metrics (formato Prometheus).
+  gateway_metricas:
+    image: nginx/nginx-prometheus-exporter:1.3.0
+    container_name: hc_gateway_metricas
+    restart: unless-stopped
+    command: ["--nginx.scrape-uri=http://hc_gateway:8081/stub_status"]
+    networks: [sedes_net]
+
+  # ------------------------------------------------------------------
+  # Observabilidad (opcional): docker compose --profile observabilidad up -d
+  #   Prometheus  http://localhost:9090      Grafana  http://localhost:3000  (tablero «Historia clínica distribuida · plataforma»)
+  # Solo escuchan en 127.0.0.1. Grafana no tiene usuario ni clave: es de solo lectura (anónimo Viewer, sin formulario de ingreso) y el tablero viene
+  # provisionado desde infra/observabilidad/grafana/, así que no hay contraseña por defecto que cambiar.
+  # ------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: hc_prometheus
+    profiles: [observabilidad]
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=2d"]
+    volumes:
+      - ./infra/observabilidad/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["127.0.0.1:9090:9090"]
+    mem_limit: 256m
+    networks: [sedes_net]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: hc_grafana
+    profiles: [observabilidad]
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_USERS_DEFAULT_THEME: light
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/hc.json
+    volumes:
+      - ./infra/observabilidad/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observabilidad/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    mem_limit: 256m
+    networks: [sedes_net]
+
+volumes:
+  pg_hsb_data:
+  pg_sincelejo_data:
+  pg_cartagena_data:
+  pg_corozal_data:
+
+networks:
+  sedes_net:
+    driver: bridge

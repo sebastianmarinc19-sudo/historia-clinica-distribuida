@@ -1,3 +1,5 @@
+> **Note: this folder (`v1/`) is the archived lab version 1; this README describes it** (sharding by identity-number range, a single app). The three-site re-engineering with logical replication, FHIR and Kubernetes (**v2**) is documented in Spanish in **[the root README](../README.md)**.
+
 # Distributed Electronic Health Record System
 
 ## 🌍 Language / Idioma

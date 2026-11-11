@@ -1,0 +1,939 @@
+{
+  "info": {
+    "name": "Historia clínica distribuida · pruebas",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Colección de pruebas con los mensajes de ejemplo del parcial (sin modificar), datos sintéticos. Importar también el entorno hc_local. El gateway usa una CA de laboratorio (credenciales/ca.crt): agréguela en Ajustes > Certificados o desactive la verificación SSL solo para este entorno local. Orden sugerido: 1) iniciar sesión, 2) bus, 3) consultas."
+  },
+  "variable": [
+    {
+      "key": "token_sede",
+      "value": ""
+    },
+    {
+      "key": "token_medico",
+      "value": ""
+    },
+    {
+      "key": "token_auditor",
+      "value": ""
+    },
+    {
+      "key": "token_admision",
+      "value": ""
+    },
+    {
+      "key": "token_paciente",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Sesión",
+      "item": [
+        {
+          "name": "Iniciar sesión (sede)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"usuario\": \"{{usuario_sede}}\", \"clave\": \"{{clave_sede}}\"}"
+            },
+            "description": "El token sirve en las tres sedes (misma clave de firma). Las claves salen de credenciales/credenciales.json."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con token', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token_sede', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión (medico)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"usuario\": \"{{usuario_medico}}\", \"clave\": \"{{clave_medico}}\"}"
+            },
+            "description": "El token sirve en las tres sedes (misma clave de firma). Las claves salen de credenciales/credenciales.json."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con token', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token_medico', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión (auditor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"usuario\": \"{{usuario_auditor}}\", \"clave\": \"{{clave_auditor}}\"}"
+            },
+            "description": "El token sirve en las tres sedes (misma clave de firma). Las claves salen de credenciales/credenciales.json."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con token', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token_auditor', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión (admision)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"usuario\": \"{{usuario_admision}}\", \"clave\": \"{{clave_admision}}\"}"
+            },
+            "description": "El token sirve en las tres sedes (misma clave de firma). Las claves salen de credenciales/credenciales.json."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con token', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token_admision', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Bus de integración (HSB)",
+      "item": [
+        {
+          "name": "HL7 ADT^A01 válido (sede 2) → entregado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_sede}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/hl7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "hl7"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "MSH|^~\\&|HIS_SEDE2|SEDE2|HSB|CENTRAL|20261107101500||ADT^A01|MSG-0001|P|2.5\nPID|1||1007^^^HIS||Rojas^Andrea||19900214|F\nPV1|1|O|||||MED-02^Ruiz^Mateo||||||||||||V-S2-0101|||||||||||||||||||||||||202611071015\nDG1|1||J45.9^Asma^I10||20261107|A\n"
+            },
+            "description": "Resultado esperado: entregado (Patient 1007, Encounter y Condition CIE-10 J45.9 en la sede 2). Si el HAPI está en frío puede responder reintentando y entregarse solo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('estado entregado/reintentando/duplicado', () => pm.expect(['entregado', 'reintentando', 'duplicado']).to.include(pm.response.json().estado));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HL7 ORU^R01 laboratorio (sede 1) → entregado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_sede}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/hl7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "hl7"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "MSH|^~\\&|HIS_SEDE1|SEDE1|HSB|CENTRAL|20261107113000||ORU^R01|MSG-0002|P|2.5\nPID|1||1001^^^HIS||Perez^Carlos||19800412|M\nPV1|1|E|||||MED-01^Vega^Laura||||||||||||V-S1-0150|||||||||||||||||||||||||202611071100\nOBR|1|||718-7^Hemoglobina^LN\nOBX|1|NM|718-7^Hemoglobina^LN||13.8|g/dL|||||F\n"
+            },
+            "description": "Esperado: Observation LOINC 718-7 = 13,8 g/dL del paciente 1001 en la sede 1."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('estado entregado/reintentando/duplicado', () => pm.expect(['entregado', 'reintentando', 'duplicado']).to.include(pm.response.json().estado));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "HL7 inválido → rechazado con 3 motivos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_sede}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/hl7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "hl7"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "MSH|^~\\&|HIS_SEDE3|SEDE3|HSB|CENTRAL|20261107120000||ADT^A01|MSG-0003|P|2.5\nPID|1||ABC123^^^HIS||Lora^Pedro||19851130|X\nPV1|1|O|||||MED-01^Vega^Laura||||||||||||V-S3-0200|||||||||||||||||||||||||202611071200\nDG1|1||DIARREA^Diarrea^L||20261107|A\n"
+            },
+            "description": "Esperado: 422 rechazado con 3 motivos (documento no numérico, sexo no válido, diagnóstico sin CIE-10). Repetirlo responde duplicado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 rechazado (o 200 duplicado si ya se envió antes)', () => pm.expect([422, 200]).to.include(pm.response.code));",
+                  "if (pm.response.code === 422) pm.test('3 motivos', () => pm.expect(pm.response.json().motivos.length).to.be.at.least(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CSV legado de la sede 3 → 3 entregadas y 2 rechazadas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_sede}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/csv?sede=3",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "csv"
+              ],
+              "query": [
+                {
+                  "key": "sede",
+                  "value": "3"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "documento;nombre;sexo;nacimiento;dx_local;fecha;triage;profesional\n1008;Camila Suarez Pineda;F;1996-02-10;DIARREA;2026-11-07T08:30;3;MED-01\n1009;Ricardo Mendoza Lara;M;1971-07-19;HIPERTENSION;2026-11-07T09:10;;MED-02\n1010;Sofia Blanco Mesa;F;2004-12-01;ASMA;2026-11-07T09:45;4;MED-01\n1011;Tomas Ortiz Vega;M;1988-05-23;DOLOR MISTERIOSO;2026-11-07T10:05;2;MED-02\n12;Nombre Corto;M;1990-01-01;CEFALEA;2026-11-07T10:30;;MED-01\n"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('5 filas', () => pm.expect(pm.response.json().filas).to.eql(5));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reenviar el ADT → duplicado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_sede}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/hl7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "hl7"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "MSH|^~\\&|HIS_SEDE2|SEDE2|HSB|CENTRAL|20261107101500||ADT^A01|MSG-0001|P|2.5\nPID|1||1007^^^HIS||Rojas^Andrea||19900214|F\nPV1|1|O|||||MED-02^Ruiz^Mateo||||||||||||V-S2-0101|||||||||||||||||||||||||202611071015\nDG1|1||J45.9^Asma^I10||20261107|A\n"
+            },
+            "description": "Reenviar el mismo mensaje (mismo MSH-10) no crea otro paciente ni otro encuentro."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('estado duplicado', () => pm.expect(['duplicado']).to.include(pm.response.json().estado));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de los mensajes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_medico}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/mensajes?limite=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resumen del bus (métricas de negocio)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_medico}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/resumen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "resumen"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ConceptMap diagnóstico local → CIE-10",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_medico}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/hsb/terminologia/conceptmap",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "terminologia",
+                "conceptmap"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ConceptMap', () => pm.expect(pm.response.json().resourceType).to.eql('ConceptMap'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Consultas y trazabilidad",
+      "item": [
+        {
+          "name": "Historia unificada de 7000001 (3 sedes)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_medico}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/historia-federada/7000001?cod_tipo_documento=CC",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "historia-federada",
+                "7000001"
+              ],
+              "query": [
+                {
+                  "key": "cod_tipo_documento",
+                  "value": "CC"
+                }
+              ]
+            },
+            "description": "Datos sintéticos: python3 scripts/datos_demo.py"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporte de HC de 7000001 (auditor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_auditor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/reporte-hc/7000001?cod_tipo_documento=CC",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "reporte-hc",
+                "7000001"
+              ],
+              "query": [
+                {
+                  "key": "cod_tipo_documento",
+                  "value": "CC"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('sello SHA-256', () => pm.expect(pm.response.json().sello_sha256).to.have.length(64));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de la plataforma",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_auditor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/estado-plataforma",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "estado-plataforma"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar la cadena de auditoría",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_auditor}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/auditoria/verificar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "auditoria",
+                "verificar"
+              ],
+              "query": []
+            },
+            "description": "Tras alterar una fila (scripts/prueba_auditoria.sh) devuelve ok=false y el primer evento alterado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('cadena íntegra', () => pm.expect(pm.response.json().ok).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acceso denegado: el admisionista no ve la historia",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admision}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/historia-federada/7000001?cod_tipo_documento=CC",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "historia-federada",
+                "7000001"
+              ],
+              "query": [
+                {
+                  "key": "cod_tipo_documento",
+                  "value": "CC"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin sesión: 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/v2/historia-federada/7000001",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "v2",
+                "historia-federada",
+                "7000001"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Salud y métricas",
+      "item": [
+        {
+          "name": "Gateway /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gateway /metrics (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "metrics"
+              ],
+              "query": []
+            },
+            "description": "En Docker Compose son las métricas del propio gateway (exportador de nginx); en Kubernetes lo atiende una sede cualquiera y Prometheus está en :30090."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sede 1 /api/health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sede/1/api/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "api",
+                "health"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Sede 1 /metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/sede/1/metrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sede",
+                "1",
+                "metrics"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Bus /hsb/health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hsb/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "health"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bus /hsb/metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hsb/metrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hsb",
+                "metrics"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

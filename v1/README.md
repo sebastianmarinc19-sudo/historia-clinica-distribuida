@@ -1,3 +1,5 @@
+> **Atención: esta carpeta (`v1/`) es la versión 1 del laboratorio, archivada; este README la describe** (fragmentación por rango de documento, una sola app). La reingeniería de tres sedes autónomas con replicación lógica, FHIR y Kubernetes (**v2**) está documentada en **[el README de la raíz](../README.md)**.
+
 # Sistema de Historia Clínica Distribuida
 
 ## 🌍 Language / Idioma
