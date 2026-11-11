@@ -27,7 +27,18 @@ docker compose down -v               # lo borra todo; el siguiente `up` empieza 
 ```
 
 Vistas por el gateway: `https://localhost:8443/sede/1/vistas/` (también `/sede/2/…` y `/sede/3/…`). El certificado es de una CA de laboratorio: importe `credenciales/ca.crt` en el navegador o use `curl --cacert credenciales/ca.crt`.
-El primer arranque del HAPI FHIR tarda decenas de segundos. Detalles, Kubernetes y alternativas más abajo.
+Detalles, Kubernetes y alternativas más abajo.
+
+### Qué esperar la primera vez (si lo ejecuta en otra máquina)
+
+- **Requisitos:** Linux con Docker y Docker Compose, su usuario en el grupo `docker`, internet y varios GB de disco libres para las imágenes. Para Docker Compose no hace falta Kubernetes ni Minikube.
+- **Primer arranque lento:** `docker compose up -d --build` descarga y construye las imágenes (la de HAPI FHIR pesa ~1 GB). Los siguientes arranques tardan unos 20 s.
+- **HAPI en frío:** el servidor FHIR tarda unos minutos en responder la primera vez. Espere antes de lanzar `demo.sh` o las pruebas de FHIR; `demo.sh` espera hasta 4 minutos al primer mensaje.
+- **Estado:** `docker compose ps` debe mostrar todo `Up` y `healthy` (11 contenedores).
+- **Aviso del navegador:** el certificado lo firma una CA de laboratorio. Pulse «Avanzado» y «Continuar a localhost», o importe `credenciales/ca.crt`.
+- **Si una página da 502** después de recrear contenedores: `docker restart hc_gateway` (el gateway guarda las direcciones antiguas).
+- **Repetir la demo:** `bash scripts/demo.sh --reiniciar` (o `docker compose down -v` y volver a levantar); sin eso, los pasos 2 y 3 salen como «duplicado» porque el bus recuerda los mensajes.
+- **Claves:** son aleatorias por instalación; véalas con `python3 scripts/credenciales.py`.
 
 ### Usuarios de prueba
 
@@ -41,6 +52,24 @@ Las claves son **aleatorias por instalación** y no están en el repositorio: `p
 | paciente `7000001` | paciente | Paciente | documento `7000001` y fecha de nacimiento `1988-04-12` (datos sintéticos de `datos_demo.py`) |
 | `sede` | sistema_sede | — | envía mensajes HL7 y CSV al bus (cuenta del sistema legado) |
 | `admin` | administrador | todas | laboratorio (reencolar mensajes muertos del bus) |
+
+### Recorrido de la demostración en la aplicación
+
+Abra una pestaña por usuario (la sesión es por pestaña, así que pueden estar todos conectados a la vez):
+
+1. **Portada** (`/sede/1/vistas/`): estado de las 3 sedes.
+2. **Admisionista** (`admision`): registra un paciente. La sede donde se registra es la dueña del dato; se ve el sello de auditoría de la escritura.
+3. **Médico** (`medico`): crea una consulta con un diagnóstico del catálogo; un código inexistente se rechaza. Cada rol solo hace lo suyo (JWT por roles).
+4. **Paciente** (documento y fecha de nacimiento): solo ve su propia historia.
+5. **Reportero** (`auditor`): Reporte de HC de `7000001`, que reúne las 3 sedes, más el estado de la auditoría encadenada y del anclaje entre sedes.
+6. **Resiliencia** (desde la terminal, a propósito: la aplicación no puede apagar su propio servidor sin acceso root a Docker):
+   ```bash
+   bash scripts/nodo.sh apagar 2     # Cartagena cae; recargue el reporte: «sin respuesta de Cartagena», las otras dos siguen
+   bash scripts/nodo.sh encender 2   # se pone al día sola con la réplica
+   ```
+7. **Bus HL7/CSV → FHIR, reintentos y alteración de la auditoría:** `bash scripts/demo.sh` (pasos 1–7).
+
+Todos los comandos se ejecutan desde la carpeta raíz del proyecto.
 
 ### Enviar los ejemplos al bus
 
